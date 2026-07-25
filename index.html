@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>가계부</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="가계부">
+<meta name="theme-color" content="#1B2A4A">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1B2A4A; --ink-2:#233457;
+    --wife:#6B4C6E; --wife-bg:#F1E7EF;
+    --paper:#F3F5EF; --paper-dim:#E7E9E0; --card:#FFFFFE;
+    --red:#B8402B; --red-bg:#F6E7E2;
+    --green:#2F6E51; --green-bg:#E4EDE6;
+    --text:#23262B; --muted:#767C70; --line:#D8DAD0;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--paper); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif; min-height:100vh; padding-bottom:100px;}
+  .mono{font-family:'Space Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums;}
+  button, input, select{ font-family:inherit; }
+
+  .app-tabs{position:sticky; top:0; z-index:26; display:flex; gap:8px; background:var(--ink-2); padding:8px 14px;}
+  .app-tabs .tab-btn{flex:1; border:none; background:rgba(255,255,255,0.1); color:#F3F5EF; padding:9px 0; border-radius:10px; font-size:13.5px; font-weight:700; opacity:0.65; cursor:pointer;}
+  .app-tabs .tab-btn.active{background:#F3F5EF; color:var(--ink); opacity:1;}
+  .app-tabs .share-btn{flex:0 0 auto; width:42px; border:none; background:rgba(255,255,255,0.1); color:#F3F5EF; padding:9px 0; border-radius:10px; font-size:15px; cursor:pointer;}
+  .app-tabs .share-btn:active{background:rgba(255,255,255,0.22);}
+
+  header.cover{
+    background:linear-gradient(160deg,var(--ink) 0%,var(--ink-2) 100%);
+    color:#F3F5EF; padding:16px 18px 16px; position:sticky; top:42px; z-index:20;
+    box-shadow:0 6px 16px rgba(27,42,74,0.18);
+  }
+  .cover-top{display:flex; align-items:center; justify-content:space-between;}
+  .cover-title{font-size:20px; font-weight:700; letter-spacing:0.5px;}
+  .gear{background:rgba(255,255,255,0.12); border:none; color:#F3F5EF; width:32px; height:32px; border-radius:50%; font-size:15px; cursor:pointer;}
+  .month-nav{display:flex; align-items:center; gap:14px; margin-top:8px;}
+  .month-nav button{background:rgba(255,255,255,0.1); border:none; color:#F3F5EF; width:28px; height:28px; border-radius:50%; font-size:15px; cursor:pointer;}
+  .month-label{font-size:15px; font-weight:600; min-width:88px; text-align:center;}
+  .month-sub{font-size:10.5px; opacity:0.55; text-align:center; margin-top:5px;}
+  .tear{height:12px; margin-top:12px; background-image:radial-gradient(circle at 50% 0, transparent 6px, var(--ink) 6.5px); background-size:16px 12px; background-repeat:repeat-x; background-position:-4px 0;}
+
+  .account-toggle{display:flex; background:rgba(255,255,255,0.1); border-radius:10px; padding:3px; margin-top:12px;}
+  .account-toggle button{flex:1; border:none; background:transparent; color:#F3F5EF; padding:9px 0; border-radius:8px; font-size:13.5px; font-weight:700; opacity:0.7; cursor:pointer;}
+  .account-toggle button.active{background:#F3F5EF; color:var(--ink); opacity:1;}
+
+  .who-cards{display:flex; gap:10px; padding:12px 14px 4px;}
+  .who-card{flex:1; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 13px;}
+  .who-card .who-head{display:flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--muted); margin-bottom:8px;}
+  .who-card .who-dot{width:8px; height:8px; border-radius:50%;}
+  .who-card.mine .who-dot{background:var(--ink);}
+  .who-card.wife .who-dot{background:var(--wife);}
+  .who-row{display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-top:4px;}
+  .who-row b{color:var(--text); font-family:'Space Mono',monospace; font-weight:700; font-size:12.5px;}
+  .who-remain{margin-top:9px; padding-top:9px; border-top:1px dashed var(--line);}
+  .who-remain .lbl{font-size:11px; color:var(--muted);}
+  .who-remain .val{font-family:'Space Mono',monospace; font-weight:700; font-size:17px; margin-top:2px;}
+  .val.pos{color:var(--green);} .val.neg{color:var(--red);}
+
+  .card-panel{margin:10px 14px 0; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 13px; display:none;}
+  .card-panel-head{font-size:12px; font-weight:700; color:var(--muted); margin-bottom:8px;}
+  .card-row{display:flex; justify-content:space-between; font-size:13px; padding:4px 0;}
+  .card-row b{font-family:'Space Mono',monospace;}
+  .card-panel-total{display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); font-size:13.5px; font-weight:700;}
+  .card-panel-total b{font-family:'Space Mono',monospace;}
+
+  .filter-chips{display:flex; gap:8px; overflow-x:auto; padding:12px 14px 4px; scrollbar-width:none;}
+  .filter-chips::-webkit-scrollbar{display:none;}
+  .fchip{flex:0 0 auto; border:1px solid var(--line); background:var(--card); border-radius:999px; padding:6px 13px; font-size:12.5px; color:var(--muted); cursor:pointer;}
+  .fchip.active{background:var(--ink); border-color:var(--ink); color:#fff;}
+
+  main{padding:6px 14px 20px;}
+  .section-label{font-size:12px; font-weight:700; color:var(--muted); padding:14px 2px 6px;}
+  .invest-total{padding:12px 14px 2px; font-size:12.5px; color:var(--muted); display:flex; justify-content:space-between; align-items:baseline;}
+  .invest-total b{font-family:'Space Mono',monospace; color:var(--text); font-size:15px;}
+
+  .stock-card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 13px; margin-bottom:8px;}
+  .stock-card .stock-name{font-size:14px; font-weight:700;}
+  .stock-stats{display:flex; gap:10px; margin-top:8px;}
+  .stock-stat{flex:1;}
+  .stock-stat .lbl{font-size:10.5px; color:var(--muted);}
+  .stock-stat .val{font-family:'Space Mono',monospace; font-weight:700; font-size:13px; margin-top:2px;}
+
+  .date-group{margin-top:16px;}
+  .date-heading{font-size:12px; color:var(--muted); font-weight:700; padding-left:2px; margin-bottom:6px; display:flex; justify-content:space-between;}
+  .entry-card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 13px; margin-bottom:8px; display:flex; align-items:center; gap:11px; cursor:pointer;}
+  .entry-card:active{background:var(--paper-dim);}
+  .entry-tag{width:36px; height:36px; border-radius:10px; flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; font-weight:700; text-align:center; line-height:1.15;}
+  .entry-body{flex:1; min-width:0;}
+  .entry-cat{font-size:13px; font-weight:600;}
+  .entry-sub{font-size:11.5px; color:var(--muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .entry-amt{font-family:'Space Mono',monospace; font-weight:700; font-size:14.5px; flex:0 0 auto; text-align:right;}
+  .entry-amt.plus{color:var(--green);} .entry-amt.minus{color:var(--red);}
+  .entry-amt .sub{display:block; font-size:10px; font-weight:400; color:var(--muted); margin-top:1px;}
+
+  .empty{text-align:center; color:var(--muted); padding:50px 20px 20px; font-size:14px; line-height:1.7;}
+  .empty .big{font-size:32px; display:block; margin-bottom:10px;}
+
+  .fab{position:fixed; right:20px; bottom:26px; z-index:30; width:56px; height:56px; border-radius:50%; background:var(--ink); color:#F3F5EF; border:none; font-size:28px; line-height:56px; text-align:center; box-shadow:0 8px 18px rgba(27,42,74,0.35); cursor:pointer;}
+  .fab:active{transform:scale(0.94);}
+
+  .sheet-backdrop{position:fixed; inset:0; background:rgba(20,24,20,0.4); opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:40;}
+  .sheet-backdrop.open{opacity:1; pointer-events:auto;}
+  .sheet{position:fixed; left:0; right:0; bottom:0; z-index:41; background:var(--paper); border-radius:20px 20px 0 0; padding:10px 18px calc(20px + env(safe-area-inset-bottom)); transform:translateY(105%); transition:transform .25s cubic-bezier(.32,.72,0,1); max-height:90vh; overflow-y:auto;}
+  .sheet.open{transform:translateY(0);}
+  .sheet-handle{width:36px; height:4px; background:var(--line); border-radius:4px; margin:6px auto 14px;}
+  .sheet-title{font-size:15px; font-weight:700; margin-bottom:14px;}
+
+  .kind-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;}
+  .kind-btn{border:1px solid var(--line); background:var(--card); border-radius:12px; padding:12px 8px; font-size:13px; font-weight:700; color:var(--text); cursor:pointer;}
+  .kind-btn .kd-desc{display:block; font-size:10.5px; font-weight:400; color:var(--muted); margin-top:2px;}
+  .kind-btn.active[data-kind="income"]{background:var(--green-bg); border-color:var(--green); color:var(--green);}
+  .kind-btn.active[data-kind="wife_gift"]{background:var(--wife-bg); border-color:var(--wife); color:var(--wife);}
+  .kind-btn.active[data-kind="shared_expense"]{background:#E9ECF3; border-color:var(--ink); color:var(--ink);}
+  .kind-btn.active[data-kind="personal_expense"]{background:var(--red-bg); border-color:var(--red); color:var(--red);}
+
+  .field{margin-bottom:15px;}
+  .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;}
+  .amount-input{width:100%; border:none; border-bottom:2px solid var(--line); background:transparent; font-family:'Space Mono',monospace; font-size:26px; font-weight:700; padding:4px 0; outline:none; color:var(--text);}
+  .amount-input:focus{border-bottom-color:var(--ink);}
+  .text-input,.date-input,.num-input{width:100%; border:1px solid var(--line); border-radius:10px; padding:11px 12px; font-size:14px; background:var(--card); outline:none; color:var(--text);}
+  .text-input:focus,.date-input:focus,.num-input:focus{border-color:var(--ink);}
+  .chip-grid{display:flex; flex-wrap:wrap; gap:8px;}
+  .chip{border:1px solid var(--line); background:var(--card); border-radius:999px; padding:8px 13px; font-size:13px; color:var(--text); cursor:pointer;}
+  .chip.active{background:var(--ink); border-color:var(--ink); color:#fff;}
+  .chip.add{border-style:dashed; color:var(--muted);}
+  .add-row{display:flex; gap:8px; margin-top:8px;}
+  .add-row input{flex:1;}
+  .add-row button{border:none; background:var(--ink); color:#fff; border-radius:8px; padding:0 14px; font-size:13px; font-weight:700;}
+
+  .toggle2{display:flex; background:var(--paper-dim); border-radius:10px; padding:3px;}
+  .toggle2 button{flex:1; border:none; background:transparent; padding:9px 0; border-radius:8px; font-size:13.5px; font-weight:700; color:var(--muted); cursor:pointer;}
+  .toggle2 button.active{background:var(--card); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+  .toggle2.buy-sell button.active[data-val="buy"]{color:var(--red);}
+  .toggle2.buy-sell button.active[data-val="sell"]{color:var(--green);}
+
+  .toggle3{display:flex; background:var(--paper-dim); border-radius:10px; padding:3px;}
+  .toggle3 button{flex:1; border:none; background:transparent; padding:9px 0; border-radius:8px; font-size:12.5px; font-weight:700; color:var(--muted); cursor:pointer;}
+  .toggle3 button.active{background:var(--card); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+  .preview-text{display:block; margin-top:7px; font-size:11.5px; color:var(--muted);}
+
+  .ratio-box{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 13px;}
+  .ratio-inputs{display:flex; align-items:center; gap:10px;}
+  .ratio-inputs .who{font-size:12px; color:var(--muted); width:38px;}
+  .ratio-inputs input[type=range]{flex:1;}
+  .ratio-nums{display:flex; justify-content:space-between; margin-top:8px; font-size:12.5px;}
+  .ratio-nums b{font-family:'Space Mono',monospace;}
+  .ratio-split{display:flex; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:1px dashed var(--line); font-size:12px; color:var(--muted);}
+  .ratio-split b{font-family:'Space Mono',monospace; color:var(--text);}
+
+  .sheet-actions{display:flex; gap:10px; margin-top:6px;}
+  .btn{flex:1; border:none; border-radius:12px; padding:14px 0; font-size:15px; font-weight:700; cursor:pointer;}
+  .btn-save{background:var(--ink); color:#F3F5EF;}
+  .btn-delete{background:var(--red-bg); color:var(--red); flex:0 0 90px;}
+
+  .toast{position:fixed; left:50%; bottom:96px; transform:translateX(-50%) translateY(20px); background:var(--ink); color:#F3F5EF; padding:10px 18px; border-radius:999px; font-size:13px; opacity:0; pointer-events:none; transition:all .25s ease; z-index:50; white-space:nowrap;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  .settings-sheet .field small{color:var(--muted); font-size:11.5px; display:block; margin-top:4px;}
+</style>
+</head>
+<body>
+
+<div class="app-tabs">
+  <button class="tab-btn active" data-tab="ledger">가계부</button>
+  <button class="tab-btn" data-tab="invest">저축</button>
+  <button class="share-btn" id="backupBtn" aria-label="백업">⋯</button>
+</div>
+
+<div class="sheet-backdrop" id="backupBackdrop"></div>
+<div class="sheet" id="backupSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">데이터 관리</div>
+  <div class="field">
+    <button class="btn btn-save" id="exportBtn" style="width:100%;">백업 파일 내보내기</button>
+    <small class="preview-text">모든 가계부·저축 데이터를 파일 하나로 저장해요. 기기를 바꾸거나 데이터가 날아갔을 때 복원용이에요.</small>
+  </div>
+  <div class="field">
+    <button class="btn" id="importBtn" style="width:100%; background:var(--paper-dim); color:var(--text);">백업 파일 불러오기</button>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none;">
+    <small class="preview-text">불러오면 현재 데이터를 덮어써요.</small>
+  </div>
+  <div class="field">
+    <small class="preview-text">이 앱은 샌드박스 안에서 실행돼서 자체적으로 공개 링크를 만들 수 없어요. 링크 공유는 Claude의 게시 기능을 통해야 해요.</small>
+  </div>
+</div>
+
+<!-- ================= 가계부 TAB ================= -->
+<div id="ledgerRoot">
+
+<header class="cover">
+  <div class="cover-top">
+    <div class="cover-title">가계부</div>
+    <button class="gear" id="gearBtn" aria-label="설정">⚙</button>
+  </div>
+  <div class="month-nav">
+    <button id="prevMonth">‹</button>
+    <div class="month-label mono" id="monthLabel">2026.07</div>
+    <button id="nextMonth">›</button>
+  </div>
+  <div class="month-sub">카드 · 공통비 · 지원금은 정산월 기준으로 표시돼요</div>
+  <div class="tear"></div>
+</header>
+
+<div class="who-cards">
+  <div class="who-card mine">
+    <div class="who-head"><span class="who-dot"></span>나</div>
+    <div class="who-row"><span>수입</span><b id="mineIncome">0</b></div>
+    <div class="who-row"><span>공통비 내 몫</span><b id="mineSharedShare">0</b></div>
+    <div class="who-row"><span>개인지출</span><b id="minePersonal">0</b></div>
+    <div class="who-remain"><div class="lbl">남는 돈</div><div class="val mono" id="mineRemaining">0</div></div>
+  </div>
+  <div class="who-card wife">
+    <div class="who-head"><span class="who-dot"></span>와이프</div>
+    <div class="who-row"><span>보내준 돈</span><b id="wifeGiven">0</b></div>
+    <div class="who-row"><span>공통비 부담분</span><b id="wifeSharedShare">0</b></div>
+    <div class="who-row"><span>공통비 총액</span><b id="sharedTotal">0</b></div>
+    <div class="who-remain"><div class="lbl">남는 돈(차액)</div><div class="val mono" id="wifeRemaining">0</div></div>
+  </div>
+</div>
+
+<div class="card-panel" id="cardPanel">
+  <div class="card-panel-head">카드 결제 예정 <span id="cardPanelMonth"></span></div>
+  <div id="cardPanelList"></div>
+  <div class="card-panel-total"><span>합계</span><b id="cardPanelTotal">0</b></div>
+</div>
+
+<div class="filter-chips" id="filterChips"></div>
+
+<main id="main">
+  <div class="empty" id="emptyState" style="display:none;">
+    <span class="big">🧾</span>
+    아직 이 달의 기록이 없어요.<br>오른쪽 아래 + 버튼으로 첫 기록을 남겨보세요.
+  </div>
+  <div id="listContainer"></div>
+</main>
+
+<button class="fab" id="fabAdd" aria-label="기록 추가">+</button>
+
+<div class="sheet-backdrop" id="backdrop"></div>
+
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">기록 추가</div>
+
+  <div class="kind-grid" id="kindGrid">
+    <button class="kind-btn" data-kind="income">내 수입<span class="kd-desc">월급, 부수입 등</span></button>
+    <button class="kind-btn" data-kind="wife_gift">와이프 지원금<span class="kd-desc">와이프가 주는 돈</span></button>
+    <button class="kind-btn" data-kind="shared_expense">공통 지출<span class="kd-desc">주거비, 가전 등</span></button>
+    <button class="kind-btn" data-kind="personal_expense">개인 지출<span class="kd-desc">카드 / 현금</span></button>
+  </div>
+
+  <div class="field">
+    <label>금액</label>
+    <input type="number" inputmode="numeric" class="amount-input" id="amountInput" placeholder="0" min="0">
+  </div>
+  <div class="field">
+    <label>날짜</label>
+    <input type="date" class="date-input" id="dateInput">
+  </div>
+
+  <div class="field" id="sharedCatField" style="display:none;">
+    <label>공통비 항목</label>
+    <div class="chip-grid" id="sharedCatChips"></div>
+    <div class="add-row" id="sharedCatAddRow" style="display:none;">
+      <input type="text" class="text-input" id="sharedCatAddInput" placeholder="새 항목 이름">
+      <button type="button" id="sharedCatAddBtn">추가</button>
+    </div>
+  </div>
+
+  <div class="field" id="ratioField" style="display:none;">
+    <label>부담 비율</label>
+    <div class="ratio-box">
+      <div class="ratio-inputs">
+        <span class="who">나</span>
+        <input type="range" id="ratioRange" min="0" max="100" step="5" value="60">
+        <span class="who">와이프</span>
+      </div>
+      <div class="ratio-nums"><span>나 <b id="ratioMineNum">60</b>%</span><span>와이프 <b id="ratioWifeNum">40</b>%</span></div>
+      <div class="ratio-split"><span>내 몫</span><b id="ratioMineAmt">₩0</b></div>
+      <div class="ratio-split"><span>와이프 몫</span><b id="ratioWifeAmt">₩0</b></div>
+    </div>
+  </div>
+
+  <div class="field" id="sharedSettleField" style="display:none;">
+    <label>정산월</label>
+    <div class="toggle3" id="sharedSettleGrid">
+      <button type="button" data-offset="-1">전월분</button>
+      <button type="button" data-offset="0" class="active">당월분</button>
+      <button type="button" data-offset="1">익월분</button>
+    </div>
+    <small class="preview-text" id="sharedSettlePreview"></small>
+  </div>
+
+  <div class="field" id="wifeSettleField" style="display:none;">
+    <label>정산월</label>
+    <div class="toggle3" id="wifeSettleGrid">
+      <button type="button" data-offset="-1">전월분</button>
+      <button type="button" data-offset="0" class="active">당월분</button>
+      <button type="button" data-offset="1">익월분</button>
+    </div>
+    <small class="preview-text" id="wifeSettlePreview">전월에 낸 공통비를 나중에 받을 때는 '전월분'을 선택하세요.</small>
+  </div>
+
+  <div class="field" id="personalCatField" style="display:none;">
+    <label>지출 항목</label>
+    <div class="chip-grid" id="personalCatChips"></div>
+    <div class="add-row" id="personalCatAddRow" style="display:none;">
+      <input type="text" class="text-input" id="personalCatAddInput" placeholder="새 항목 이름">
+      <button type="button" id="personalCatAddBtn">추가</button>
+    </div>
+  </div>
+
+  <div class="field" id="paymentField" style="display:none;">
+    <label>결제 수단</label>
+    <div class="toggle2">
+      <button type="button" id="payCardBtn" class="active">카드</button>
+      <button type="button" id="payCashBtn">현금</button>
+    </div>
+  </div>
+
+  <div class="field" id="cardCoField" style="display:none;">
+    <label>카드사</label>
+    <div class="chip-grid" id="cardCoChips"></div>
+    <div class="add-row" id="cardCoAddRow" style="display:none;">
+      <input type="text" class="text-input" id="cardCoAddInput" placeholder="카드사 이름">
+      <button type="button" id="cardCoAddBtn">추가</button>
+    </div>
+    <small class="preview-text" id="cardPayPreview"></small>
+  </div>
+
+  <div class="field">
+    <label>메모 (선택)</label>
+    <input type="text" class="text-input" id="memoInput" placeholder="메모" maxlength="60">
+  </div>
+
+  <div class="sheet-actions">
+    <button class="btn btn-delete" id="deleteBtn" style="display:none;">삭제</button>
+    <button class="btn btn-save" id="saveBtn">저장</button>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="settingsBackdrop"></div>
+<div class="sheet settings-sheet" id="settingsSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">설정</div>
+  <div class="field">
+    <label>기본 공통비 분담 비율 (나 기준 %)</label>
+    <input type="number" class="num-input" id="defaultRatioInput" min="0" max="100" value="60">
+    <small>새 공통 지출을 추가할 때 기본으로 적용돼요. 항목마다 개별 조정도 가능해요.</small>
+  </div>
+  <div class="field">
+    <small>카드 결제일 규칙: 이용기간 매월 14일~다음달 13일, 결제일은 다음달 25일이에요. (예: 7/20 이용 → 8/25 결제) 자동으로 계산돼요.</small>
+  </div>
+  <div class="sheet-actions">
+    <button class="btn btn-save" id="settingsSaveBtn">저장</button>
+  </div>
+</div>
+
+</div>
+<!-- ================= /가계부 TAB ================= -->
+
+
+<!-- ================= 저축 TAB ================= -->
+<div id="investRoot" style="display:none;">
+
+<header class="cover">
+  <div class="cover-top">
+    <div class="cover-title">저축</div>
+  </div>
+  <div class="account-toggle" id="accountToggle">
+    <button type="button" data-acc="mine" class="active">내 계좌</button>
+    <button type="button" data-acc="wife">와이프 계좌</button>
+  </div>
+</header>
+
+<div class="invest-total"><span>총 매입액</span><b id="investTotalCost">₩0</b></div>
+
+<main id="investMain">
+  <div id="stockSummaryList"></div>
+  <div class="empty" id="investEmpty" style="display:none;">
+    <span class="big">📈</span>
+    아직 거래 내역이 없어요.<br>오른쪽 아래 + 버튼으로 첫 매수/매도를 기록해보세요.
+  </div>
+  <div class="section-label" id="investListLabel" style="display:none;">매수/매도 내역</div>
+  <div id="investListContainer"></div>
+</main>
+
+<button class="fab" id="investFab" aria-label="거래 추가" style="display:none;">+</button>
+
+<div class="sheet-backdrop" id="investBackdrop"></div>
+<div class="sheet" id="investSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">매수/매도 기록</div>
+
+  <div class="field">
+    <label>계좌</label>
+    <div class="toggle2" id="investAccountToggle">
+      <button type="button" data-val="mine" class="active">내 계좌</button>
+      <button type="button" data-val="wife">와이프 계좌</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>구분</label>
+    <div class="toggle2 buy-sell" id="investTypeToggle">
+      <button type="button" data-val="buy" class="active">매수</button>
+      <button type="button" data-val="sell">매도</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>종목</label>
+    <div class="chip-grid" id="stockChips"></div>
+    <div class="add-row" id="stockAddRow" style="display:none;">
+      <input type="text" class="text-input" id="stockAddInput" placeholder="종목명">
+      <button type="button" id="stockAddBtn">추가</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>가격 (단가)</label>
+    <input type="number" inputmode="numeric" class="amount-input" id="priceInput" placeholder="0" min="0">
+  </div>
+
+  <div class="field">
+    <label>수량</label>
+    <input type="number" inputmode="decimal" class="text-input" id="qtyInput" placeholder="0" min="0" step="any">
+  </div>
+
+  <div class="field">
+    <small class="preview-text" id="investTotalPreview">총액: ₩0</small>
+  </div>
+
+  <div class="field">
+    <label>날짜</label>
+    <input type="date" class="date-input" id="investDateInput">
+  </div>
+
+  <div class="field">
+    <label>메모 (선택)</label>
+    <input type="text" class="text-input" id="investMemoInput" placeholder="메모" maxlength="60">
+  </div>
+
+  <div class="sheet-actions">
+    <button class="btn btn-delete" id="investDeleteBtn" style="display:none;">삭제</button>
+    <button class="btn btn-save" id="investSaveBtn">저장</button>
+  </div>
+</div>
+
+</div>
+<!-- ================= /저축 TAB ================= -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const DEFAULTS = {
+    ratioMine: 60,
+    sharedCategories: ['주거비용 (전세이자·관리비)','가전/가구'],
+    personalCategories: ['식비','교통','생활','쇼핑','문화/여가','기타'],
+    cardCompanies: ['신한카드','삼성카드','현대카드','국민카드','우리카드','롯데카드','하나카드','NH농협카드'],
+    stocksByAccount: { mine: [], wife: [] }
+  };
+
+  let settings = JSON.parse(JSON.stringify(DEFAULTS));
+  let entries = [];
+  let investEntries = [];
+  let currentTab = 'ledger';
+  let currentMonth = new Date().toISOString().slice(0,7);
+  let editingId = null;
+  let currentKind = null;
+  let selectedSharedCat = null;
+  let selectedPersonalCat = null;
+  let selectedCardCo = null;
+  let paymentMethod = 'card';
+  let sharedSettleOffset = 0;
+  let wifeSettleOffset = 0;
+  let currentFilter = 'all';
+
+  let currentAccount = 'mine';
+  let editingInvestId = null;
+  let investAccount = 'mine';
+  let investType = 'buy';
+  let selectedStock = null;
+
+  function fmt(n){ return Math.round(n||0).toLocaleString('ko-KR'); }
+  function won(n){ return '₩' + fmt(n); }
+  function showToast(msg){
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 2000);
+  }
+  function escapeHtml(str){ const d=document.createElement('div'); d.textContent=str; return d.innerHTML; }
+
+  // ---- month / settlement helpers ----
+  function addMonths(ym, n){
+    const [y,m] = ym.split('-').map(Number);
+    const d = new Date(y, m-1+n, 1);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  }
+  function cardPaymentMonth(dateStr){
+    const ym = dateStr.slice(0,7);
+    const day = parseInt(dateStr.slice(8,10),10);
+    return day>=14 ? addMonths(ym,1) : ym;
+  }
+  function effectiveMonth(e){
+    if(e.kind==='wife_gift' || e.kind==='shared_expense') return addMonths(e.date.slice(0,7), e.settleOffset||0);
+    if(e.kind==='personal_expense' && e.paymentMethod==='card') return cardPaymentMonth(e.date);
+    return e.date.slice(0,7);
+  }
+  function fmtMonth(ym){ return ym.replace('-','.'); }
+
+  // ================= LOAD / SAVE =================
+  // ===== 저장소 레이어: 아티팩트 storage → 로컬 저장 순으로 자동 대체 =====
+  const store = {
+    async get(key){
+      if(window.storage && window.storage.get){
+        try{
+          const r = await window.storage.get(key, false);
+          if(r && r.value != null) return r.value;
+        }catch(e){ /* fall through */ }
+      }
+      try{ return window.localStorage.getItem('ledger_'+key); }catch(e){ return null; }
+    },
+    async set(key, value){
+      let ok = false;
+      if(window.storage && window.storage.set){
+        try{ const r = await window.storage.set(key, value, false); ok = !!r; }catch(e){ ok = false; }
+      }
+      try{ window.localStorage.setItem('ledger_'+key, value); ok = true; }catch(e){ /* ignore */ }
+      return ok;
+    }
+  };
+
+  async function loadAll(){
+    try{
+      const [eVal, sVal, iVal] = await Promise.all([
+        store.get('entries'), store.get('settings'), store.get('investEntries')
+      ]);
+      entries = eVal ? JSON.parse(eVal) : [];
+      settings = sVal ? Object.assign({}, DEFAULTS, JSON.parse(sVal)) : JSON.parse(JSON.stringify(DEFAULTS));
+      if(!settings.stocksByAccount) settings.stocksByAccount = { mine: [], wife: [] };
+      investEntries = iVal ? JSON.parse(iVal) : [];
+    }catch(e){
+      entries = []; investEntries = []; settings = JSON.parse(JSON.stringify(DEFAULTS));
+    }
+    renderFilterChips();
+    render();
+  }
+  async function saveEntries(){
+    const ok = await store.set('entries', JSON.stringify(entries));
+    if(!ok) showToast('저장 실패');
+  }
+  async function saveSettings(){
+    await store.set('settings', JSON.stringify(settings));
+  }
+  async function saveInvestEntries(){
+    const ok = await store.set('investEntries', JSON.stringify(investEntries));
+    if(!ok) showToast('저장 실패');
+  }
+
+  // ================= TAB SWITCH =================
+  document.querySelectorAll('.tab-btn').forEach(b=> b.addEventListener('click', ()=> switchTab(b.dataset.tab)));
+  function switchTab(tab){
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.tab===tab));
+    $('ledgerRoot').style.display = tab==='ledger' ? '' : 'none';
+    $('investRoot').style.display = tab==='invest' ? '' : 'none';
+    $('fabAdd').style.display = tab==='ledger' ? '' : 'none';
+    $('investFab').style.display = tab==='invest' ? '' : 'none';
+    if(tab==='invest') renderInvest();
+  }
+
+  // ================= 가계부 (unchanged core logic) =================
+  function monthEntries(){
+    return entries.filter(e=> effectiveMonth(e)===currentMonth)
+                  .sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  }
+
+  const KIND_LABEL = {income:'수입', wife_gift:'와이프', shared_expense:'공통', personal_expense:'개인'};
+  const KIND_COLOR = {income:'#2F6E51', wife_gift:'#6B4C6E', shared_expense:'#1B2A4A', personal_expense:'#B8402B'};
+
+  function renderFilterChips(){
+    const chips = [
+      {key:'all', label:'전체'},
+      {key:'income', label:'내 수입'},
+      {key:'wife_gift', label:'와이프 지원'},
+      {key:'shared_expense', label:'공통지출'},
+      {key:'personal_expense', label:'개인지출'}
+    ];
+    const wrap = $('filterChips'); wrap.innerHTML = '';
+    chips.forEach(c=>{
+      const el = document.createElement('div');
+      el.className = 'fchip' + (currentFilter===c.key ? ' active' : '');
+      el.textContent = c.label;
+      el.addEventListener('click', ()=>{ currentFilter = c.key; renderFilterChips(); render(); });
+      wrap.appendChild(el);
+    });
+  }
+
+  function computeTotals(mEntries){
+    let mineIncome=0, wifeGiven=0, sharedTotal=0, mineSharedShare=0, minePersonal=0;
+    mEntries.forEach(e=>{
+      if(e.kind==='income') mineIncome += e.amount;
+      else if(e.kind==='wife_gift') wifeGiven += e.amount;
+      else if(e.kind==='shared_expense'){ sharedTotal += e.amount; mineSharedShare += e.amount*(e.ratioMine/100); }
+      else if(e.kind==='personal_expense') minePersonal += e.amount;
+    });
+    const wifeSharedShare = sharedTotal - mineSharedShare;
+    const mineAvailable = mineIncome + wifeGiven;
+    const mineExpense = minePersonal + mineSharedShare;
+    const mineRemaining = mineAvailable - mineExpense;
+    const wifeRemaining = wifeGiven - wifeSharedShare;
+    return {mineIncome, wifeGiven, sharedTotal, mineSharedShare, wifeSharedShare, minePersonal, mineRemaining, wifeRemaining};
+  }
+
+  function render(){
+    const [y,m] = currentMonth.split('-');
+    $('monthLabel').textContent = `${y}.${m}`;
+    const mEntries = monthEntries();
+    const t = computeTotals(mEntries);
+
+    $('mineIncome').textContent = fmt(t.mineIncome);
+    $('mineSharedShare').textContent = fmt(t.mineSharedShare);
+    $('minePersonal').textContent = fmt(t.minePersonal);
+    const mr = $('mineRemaining'); mr.textContent = (t.mineRemaining>=0?'+':'') + fmt(t.mineRemaining);
+    mr.className = 'val mono ' + (t.mineRemaining>=0?'pos':'neg');
+
+    $('wifeGiven').textContent = fmt(t.wifeGiven);
+    $('wifeSharedShare').textContent = fmt(t.wifeSharedShare);
+    $('sharedTotal').textContent = fmt(t.sharedTotal);
+    const wr = $('wifeRemaining'); wr.textContent = (t.wifeRemaining>=0?'+':'') + fmt(t.wifeRemaining);
+    wr.className = 'val mono ' + (t.wifeRemaining>=0?'pos':'neg');
+
+    const cardEntries = mEntries.filter(e=> e.kind==='personal_expense' && e.paymentMethod==='card');
+    if(cardEntries.length===0){
+      $('cardPanel').style.display = 'none';
+    }else{
+      $('cardPanel').style.display = 'block';
+      $('cardPanelMonth').textContent = `· ${y}.${m}.25 결제분`;
+      const byCo = {}; let total = 0;
+      cardEntries.forEach(e=>{ byCo[e.cardCompany] = (byCo[e.cardCompany]||0) + e.amount; total += e.amount; });
+      const listEl = $('cardPanelList'); listEl.innerHTML = '';
+      Object.keys(byCo).sort((a,b)=> byCo[b]-byCo[a]).forEach(co=>{
+        const row = document.createElement('div'); row.className = 'card-row';
+        row.innerHTML = `<span>${escapeHtml(co)}</span><b>${fmt(byCo[co])}</b>`;
+        listEl.appendChild(row);
+      });
+      $('cardPanelTotal').textContent = fmt(total);
+    }
+
+    const listContainer = $('listContainer');
+    const emptyState = $('emptyState');
+    listContainer.innerHTML = '';
+    const filtered = currentFilter==='all' ? mEntries : mEntries.filter(e=>e.kind===currentFilter);
+    if(filtered.length===0){ emptyState.style.display='block'; return; }
+    emptyState.style.display='none';
+
+    const groups = {};
+    filtered.forEach(e=>{ (groups[e.date] = groups[e.date]||[]).push(e); });
+    Object.keys(groups).sort((a,b)=>b.localeCompare(a)).forEach(date=>{
+      const d = new Date(date+'T00:00:00');
+      const wd = ['일','월','화','수','목','금','토'][d.getDay()];
+      const heading = document.createElement('div');
+      heading.className = 'date-group';
+      heading.innerHTML = `<div class="date-heading"><span>${date.slice(5).replace('-','.')} (${wd})</span></div>`;
+      const wrap = document.createElement('div');
+      groups[date].forEach(e=>{
+        const card = document.createElement('div');
+        card.className = 'entry-card';
+        const color = KIND_COLOR[e.kind];
+        const kindLabel = KIND_LABEL[e.kind];
+        let title, sub, amtClass, amtPrefix, amtSub='';
+        if(e.kind==='income'){ title = e.memo || '내 수입'; sub = '수입'; amtClass='plus'; amtPrefix='+'; }
+        else if(e.kind==='wife_gift'){
+          title = e.memo || '와이프 지원금';
+          const note = e.settleOffset<0 ? '전월분 정산' : (e.settleOffset>0 ? '익월분 정산' : '당월분 정산');
+          sub = note + (e.memo? ' · '+e.memo : '');
+          amtClass='plus'; amtPrefix='+';
+        }
+        else if(e.kind==='shared_expense'){
+          title = e.category || '공통지출';
+          const note = e.settleOffset<0 ? '전월분' : (e.settleOffset>0 ? '익월분' : '당월분');
+          sub = `공통 · 나 ${e.ratioMine}% / 와이프 ${100-e.ratioMine}% · ${note}` + (e.memo? ' · '+e.memo : '');
+          amtClass='minus'; amtPrefix='-';
+          amtSub = `내 몫 ${fmt(e.amount*e.ratioMine/100)}`;
+        } else {
+          title = e.category || '개인지출';
+          if(e.paymentMethod==='card'){
+            const pm = cardPaymentMonth(e.date);
+            sub = `${e.cardCompany||'카드'} · 결제 ${fmtMonth(pm)}.25` + (e.memo? ' · '+e.memo : '');
+          }else{
+            sub = '현금' + (e.memo? ' · '+e.memo : '');
+          }
+          amtClass='minus'; amtPrefix='-';
+        }
+        card.innerHTML = `
+          <div class="entry-tag" style="background:${color}">${kindLabel}</div>
+          <div class="entry-body">
+            <div class="entry-cat">${escapeHtml(title)}</div>
+            <div class="entry-sub">${escapeHtml(sub)}</div>
+          </div>
+          <div class="entry-amt ${amtClass}">${amtPrefix}${fmt(e.amount)}${amtSub?`<span class="sub">${amtSub}</span>`:''}</div>
+        `;
+        card.addEventListener('click', ()=> openSheet(e));
+        wrap.appendChild(card);
+      });
+      heading.appendChild(wrap);
+      listContainer.appendChild(heading);
+    });
+  }
+
+  function renderChips(containerId, addRowId, items, selected, onSelect){
+    const wrap = $(containerId);
+    wrap.innerHTML = '';
+    items.forEach(label=>{
+      const chip = document.createElement('div');
+      chip.className = 'chip' + (label===selected ? ' active' : '');
+      chip.textContent = label;
+      chip.addEventListener('click', ()=> onSelect(label));
+      wrap.appendChild(chip);
+    });
+    const addChip = document.createElement('div');
+    addChip.className = 'chip add';
+    addChip.textContent = '+ 새 항목';
+    addChip.addEventListener('click', ()=>{
+      const row = $(addRowId);
+      row.style.display = row.style.display==='flex' ? 'none' : 'flex';
+    });
+    wrap.appendChild(addChip);
+  }
+
+  function refreshSharedCatChips(){
+    renderChips('sharedCatChips','sharedCatAddRow', settings.sharedCategories, selectedSharedCat, (v)=>{ selectedSharedCat=v; refreshSharedCatChips(); });
+  }
+  function refreshPersonalCatChips(){
+    renderChips('personalCatChips','personalCatAddRow', settings.personalCategories, selectedPersonalCat, (v)=>{ selectedPersonalCat=v; refreshPersonalCatChips(); });
+  }
+  function refreshCardCoChips(){
+    renderChips('cardCoChips','cardCoAddRow', settings.cardCompanies, selectedCardCo, (v)=>{ selectedCardCo=v; refreshCardCoChips(); updateDateDependentPreviews(); });
+  }
+
+  $('sharedCatAddBtn').addEventListener('click', ()=>{
+    const v = $('sharedCatAddInput').value.trim();
+    if(!v) return;
+    if(!settings.sharedCategories.includes(v)) settings.sharedCategories.push(v);
+    selectedSharedCat = v; $('sharedCatAddInput').value=''; $('sharedCatAddRow').style.display='none';
+    refreshSharedCatChips(); saveSettings();
+  });
+  $('personalCatAddBtn').addEventListener('click', ()=>{
+    const v = $('personalCatAddInput').value.trim();
+    if(!v) return;
+    if(!settings.personalCategories.includes(v)) settings.personalCategories.push(v);
+    selectedPersonalCat = v; $('personalCatAddInput').value=''; $('personalCatAddRow').style.display='none';
+    refreshPersonalCatChips(); saveSettings();
+  });
+  $('cardCoAddBtn').addEventListener('click', ()=>{
+    const v = $('cardCoAddInput').value.trim();
+    if(!v) return;
+    if(!settings.cardCompanies.includes(v)) settings.cardCompanies.push(v);
+    selectedCardCo = v; $('cardCoAddInput').value=''; $('cardCoAddRow').style.display='none';
+    refreshCardCoChips(); saveSettings();
+  });
+
+  function updateRatioDisplay(){
+    const mine = parseInt($('ratioRange').value,10);
+    $('ratioMineNum').textContent = mine;
+    $('ratioWifeNum').textContent = 100-mine;
+    const amount = parseFloat($('amountInput').value) || 0;
+    $('ratioMineAmt').textContent = won(amount*mine/100);
+    $('ratioWifeAmt').textContent = won(amount*(100-mine)/100);
+  }
+  $('ratioRange').addEventListener('input', updateRatioDisplay);
+  $('amountInput').addEventListener('input', updateRatioDisplay);
+
+  function syncSettleUI(which){
+    const offset = which==='shared' ? sharedSettleOffset : wifeSettleOffset;
+    const gridId = which==='shared' ? 'sharedSettleGrid' : 'wifeSettleGrid';
+    document.querySelectorAll('#'+gridId+' button').forEach(b=> b.classList.toggle('active', parseInt(b.dataset.offset,10)===offset));
+  }
+  document.querySelectorAll('#sharedSettleGrid button').forEach(b=> b.addEventListener('click', ()=>{
+    sharedSettleOffset = parseInt(b.dataset.offset,10); syncSettleUI('shared'); updateDateDependentPreviews();
+  }));
+  document.querySelectorAll('#wifeSettleGrid button').forEach(b=> b.addEventListener('click', ()=>{
+    wifeSettleOffset = parseInt(b.dataset.offset,10); syncSettleUI('wife'); updateDateDependentPreviews();
+  }));
+
+  function updateDateDependentPreviews(){
+    const date = $('dateInput').value || new Date().toISOString().slice(0,10);
+    const dm = date.slice(0,7);
+    $('sharedSettlePreview').textContent = `→ ${fmtMonth(addMonths(dm, sharedSettleOffset))} 정산에 반영`;
+    $('wifeSettlePreview').textContent = `→ ${fmtMonth(addMonths(dm, wifeSettleOffset))} 정산에 반영 · 전월에 낸 공통비를 나중에 받을 땐 '전월분'`;
+    if(paymentMethod==='card'){
+      $('cardPayPreview').textContent = `카드 결제일: ${fmtMonth(cardPaymentMonth(date))}.25 (이용기간 14일~다음달 13일 기준 자동계산)`;
+    }
+  }
+  $('dateInput').addEventListener('input', updateDateDependentPreviews);
+
+  $('payCardBtn').addEventListener('click', ()=>{ paymentMethod='card'; syncPaymentUI(); updateDateDependentPreviews(); });
+  $('payCashBtn').addEventListener('click', ()=>{ paymentMethod='cash'; syncPaymentUI(); });
+  function syncPaymentUI(){
+    $('payCardBtn').classList.toggle('active', paymentMethod==='card');
+    $('payCashBtn').classList.toggle('active', paymentMethod==='cash');
+    $('cardCoField').style.display = paymentMethod==='card' ? 'block' : 'none';
+  }
+
+  function setKind(kind){
+    currentKind = kind;
+    document.querySelectorAll('.kind-btn').forEach(b=> b.classList.toggle('active', b.dataset.kind===kind));
+    $('sharedCatField').style.display = kind==='shared_expense' ? 'block' : 'none';
+    $('ratioField').style.display = kind==='shared_expense' ? 'block' : 'none';
+    $('sharedSettleField').style.display = kind==='shared_expense' ? 'block' : 'none';
+    $('wifeSettleField').style.display = kind==='wife_gift' ? 'block' : 'none';
+    $('personalCatField').style.display = kind==='personal_expense' ? 'block' : 'none';
+    $('paymentField').style.display = kind==='personal_expense' ? 'block' : 'none';
+    $('cardCoField').style.display = (kind==='personal_expense' && paymentMethod==='card') ? 'block' : 'none';
+    if(kind==='shared_expense'){ refreshSharedCatChips(); updateRatioDisplay(); syncSettleUI('shared'); }
+    if(kind==='wife_gift'){ syncSettleUI('wife'); }
+    if(kind==='personal_expense'){ refreshPersonalCatChips(); refreshCardCoChips(); syncPaymentUI(); }
+    updateDateDependentPreviews();
+  }
+  document.querySelectorAll('.kind-btn').forEach(b=> b.addEventListener('click', ()=> setKind(b.dataset.kind)));
+
+  function openSheet(entry){
+    editingId = entry ? entry.id : null;
+    $('amountInput').value = entry ? entry.amount : '';
+    $('dateInput').value = entry ? entry.date : new Date().toISOString().slice(0,10);
+    $('memoInput').value = entry ? (entry.memo||'') : '';
+    $('sharedCatAddRow').style.display='none'; $('personalCatAddRow').style.display='none'; $('cardCoAddRow').style.display='none';
+
+    if(entry){
+      if(entry.kind==='shared_expense'){ selectedSharedCat = entry.category; $('ratioRange').value = entry.ratioMine; sharedSettleOffset = entry.settleOffset||0; }
+      if(entry.kind==='wife_gift'){ wifeSettleOffset = entry.settleOffset||0; }
+      if(entry.kind==='personal_expense'){ selectedPersonalCat = entry.category; paymentMethod = entry.paymentMethod||'card'; selectedCardCo = entry.cardCompany||null; }
+      setKind(entry.kind);
+    }else{
+      selectedSharedCat = null; selectedPersonalCat = null; selectedCardCo = null;
+      $('ratioRange').value = settings.ratioMine; paymentMethod='card';
+      sharedSettleOffset = 0; wifeSettleOffset = 0;
+      setKind('income');
+    }
+    updateRatioDisplay();
+    $('deleteBtn').style.display = entry ? 'block' : 'none';
+    $('backdrop').classList.add('open'); $('sheet').classList.add('open');
+  }
+  function closeSheet(){ $('backdrop').classList.remove('open'); $('sheet').classList.remove('open'); editingId=null; }
+
+  async function handleSave(){
+    const amount = parseFloat($('amountInput').value);
+    if(!amount || amount<=0){ showToast('금액을 입력해주세요'); return; }
+    const date = $('dateInput').value || new Date().toISOString().slice(0,10);
+    const memo = $('memoInput').value.trim();
+    if(!currentKind){ showToast('종류를 선택해주세요'); return; }
+
+    let data = { id: editingId || (Date.now().toString(36)+Math.random().toString(36).slice(2,7)), kind: currentKind, amount, date, memo };
+    if(currentKind==='shared_expense'){
+      if(!selectedSharedCat){ showToast('공통비 항목을 선택해주세요'); return; }
+      data.category = selectedSharedCat;
+      data.ratioMine = parseInt($('ratioRange').value,10);
+      data.settleOffset = sharedSettleOffset;
+    }else if(currentKind==='wife_gift'){
+      data.settleOffset = wifeSettleOffset;
+    }else if(currentKind==='personal_expense'){
+      if(!selectedPersonalCat){ showToast('지출 항목을 선택해주세요'); return; }
+      data.category = selectedPersonalCat;
+      data.paymentMethod = paymentMethod;
+      if(paymentMethod==='card'){
+        if(!selectedCardCo){ showToast('카드사를 선택해주세요'); return; }
+        data.cardCompany = selectedCardCo;
+      }
+    }
+
+    if(editingId){
+      const idx = entries.findIndex(e=>e.id===editingId);
+      if(idx>-1) entries[idx] = data;
+    }else{
+      entries.push(data);
+    }
+    const eff = effectiveMonth(data);
+    if(eff !== currentMonth) currentMonth = eff;
+    closeSheet(); render();
+    await saveEntries();
+  }
+  async function handleDelete(){
+    entries = entries.filter(e=>e.id!==editingId);
+    closeSheet(); render();
+    await saveEntries();
+  }
+
+  $('prevMonth').addEventListener('click', ()=>{ currentMonth = addMonths(currentMonth,-1); render(); });
+  $('nextMonth').addEventListener('click', ()=>{ currentMonth = addMonths(currentMonth,1); render(); });
+  $('fabAdd').addEventListener('click', ()=> openSheet(null));
+  $('backdrop').addEventListener('click', closeSheet);
+  $('saveBtn').addEventListener('click', handleSave);
+  $('deleteBtn').addEventListener('click', handleDelete);
+
+  $('gearBtn').addEventListener('click', ()=>{
+    $('defaultRatioInput').value = settings.ratioMine;
+    $('settingsBackdrop').classList.add('open'); $('settingsSheet').classList.add('open');
+  });
+  $('settingsBackdrop').addEventListener('click', ()=>{
+    $('settingsBackdrop').classList.remove('open'); $('settingsSheet').classList.remove('open');
+  });
+  $('settingsSaveBtn').addEventListener('click', async ()=>{
+    let v = parseInt($('defaultRatioInput').value,10);
+    if(isNaN(v) || v<0 || v>100) v = 60;
+    settings.ratioMine = v;
+    await saveSettings();
+    $('settingsBackdrop').classList.remove('open'); $('settingsSheet').classList.remove('open');
+    showToast('설정이 저장되었어요');
+  });
+
+  // ================= 저축 (investment) =================
+  document.querySelectorAll('#accountToggle button').forEach(b=> b.addEventListener('click', ()=>{
+    currentAccount = b.dataset.acc;
+    document.querySelectorAll('#accountToggle button').forEach(x=> x.classList.toggle('active', x.dataset.acc===currentAccount));
+    renderInvest();
+  }));
+
+  function computeStockSummary(account){
+    const txs = investEntries.filter(e=>e.account===account).slice().sort((a,b)=> a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+    const byStock = {};
+    txs.forEach(e=>{
+      if(!byStock[e.stock]) byStock[e.stock] = {qty:0, cost:0};
+      const s = byStock[e.stock];
+      if(e.type==='buy'){
+        s.qty += e.qty;
+        s.cost += e.qty*e.price;
+      }else{
+        const avg = s.qty>0 ? s.cost/s.qty : 0;
+        s.qty -= e.qty;
+        s.cost -= e.qty*avg;
+        if(s.qty<=0){ s.qty=0; s.cost=0; }
+      }
+    });
+    return byStock;
+  }
+
+  function renderInvest(){
+    const txs = investEntries.filter(e=>e.account===currentAccount).sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+    const summary = computeStockSummary(currentAccount);
+    const stockNames = Object.keys(summary).filter(k=> summary[k].qty>0 || investEntries.some(e=>e.account===currentAccount && e.stock===k));
+
+    let totalCost = 0;
+    Object.values(summary).forEach(s=> totalCost += s.cost);
+    $('investTotalCost').textContent = won(totalCost);
+
+    const summaryEl = $('stockSummaryList');
+    summaryEl.innerHTML = '';
+    stockNames.sort((a,b)=> summary[b].cost - summary[a].cost).forEach(name=>{
+      const s = summary[name];
+      const avg = s.qty>0 ? s.cost/s.qty : 0;
+      const card = document.createElement('div');
+      card.className = 'stock-card';
+      card.innerHTML = `
+        <div class="stock-name">${escapeHtml(name)}</div>
+        <div class="stock-stats">
+          <div class="stock-stat"><div class="lbl">보유수량</div><div class="val">${s.qty.toLocaleString('ko-KR')}</div></div>
+          <div class="stock-stat"><div class="lbl">평단</div><div class="val">${won(avg)}</div></div>
+          <div class="stock-stat"><div class="lbl">매입액</div><div class="val">${won(s.cost)}</div></div>
+        </div>
+      `;
+      summaryEl.appendChild(card);
+    });
+
+    const listContainer = $('investListContainer');
+    listContainer.innerHTML = '';
+    if(txs.length===0){
+      $('investEmpty').style.display = 'block';
+      $('investListLabel').style.display = 'none';
+    }else{
+      $('investEmpty').style.display = 'none';
+      $('investListLabel').style.display = 'block';
+      txs.forEach(e=>{
+        const card = document.createElement('div');
+        card.className = 'entry-card';
+        const color = e.type==='buy' ? '#B8402B' : '#2F6E51';
+        const label = e.type==='buy' ? '매수' : '매도';
+        const total = e.price*e.qty;
+        card.innerHTML = `
+          <div class="entry-tag" style="background:${color}">${label}</div>
+          <div class="entry-body">
+            <div class="entry-cat">${escapeHtml(e.stock)}</div>
+            <div class="entry-sub">${e.date.slice(5).replace('-','.')} · 단가 ${fmt(e.price)} · 수량 ${e.qty.toLocaleString('ko-KR')}${e.memo? ' · '+escapeHtml(e.memo):''}</div>
+          </div>
+          <div class="entry-amt ${e.type==='buy'?'minus':'plus'}">${e.type==='buy'?'-':'+'}${fmt(total)}</div>
+        `;
+        card.addEventListener('click', ()=> openInvestSheet(e));
+        listContainer.appendChild(card);
+      });
+    }
+  }
+
+  document.querySelectorAll('#investAccountToggle button').forEach(b=> b.addEventListener('click', ()=>{
+    investAccount = b.dataset.val;
+    document.querySelectorAll('#investAccountToggle button').forEach(x=> x.classList.toggle('active', x.dataset.val===investAccount));
+    selectedStock = null;
+    refreshStockChips();
+  }));
+  document.querySelectorAll('#investTypeToggle button').forEach(b=> b.addEventListener('click', ()=>{
+    investType = b.dataset.val;
+    document.querySelectorAll('#investTypeToggle button').forEach(x=> x.classList.toggle('active', x.dataset.val===investType));
+  }));
+
+  function refreshStockChips(){
+    const list = (settings.stocksByAccount && settings.stocksByAccount[investAccount]) || [];
+    renderChips('stockChips','stockAddRow', list, selectedStock, (v)=>{ selectedStock=v; refreshStockChips(); });
+  }
+  $('stockAddBtn').addEventListener('click', ()=>{
+    const v = $('stockAddInput').value.trim();
+    if(!v) return;
+    if(!settings.stocksByAccount[investAccount]) settings.stocksByAccount[investAccount] = [];
+    if(!settings.stocksByAccount[investAccount].includes(v)) settings.stocksByAccount[investAccount].push(v);
+    selectedStock = v; $('stockAddInput').value=''; $('stockAddRow').style.display='none';
+    refreshStockChips(); saveSettings();
+  });
+
+  function updateInvestTotalPreview(){
+    const price = parseFloat($('priceInput').value)||0;
+    const qty = parseFloat($('qtyInput').value)||0;
+    $('investTotalPreview').textContent = `총액: ${won(price*qty)}`;
+  }
+  $('priceInput').addEventListener('input', updateInvestTotalPreview);
+  $('qtyInput').addEventListener('input', updateInvestTotalPreview);
+
+  function openInvestSheet(entry){
+    editingInvestId = entry ? entry.id : null;
+    investAccount = entry ? entry.account : currentAccount;
+    investType = entry ? entry.type : 'buy';
+    selectedStock = entry ? entry.stock : null;
+    document.querySelectorAll('#investAccountToggle button').forEach(x=> x.classList.toggle('active', x.dataset.val===investAccount));
+    document.querySelectorAll('#investTypeToggle button').forEach(x=> x.classList.toggle('active', x.dataset.val===investType));
+    refreshStockChips();
+    $('priceInput').value = entry ? entry.price : '';
+    $('qtyInput').value = entry ? entry.qty : '';
+    $('investDateInput').value = entry ? entry.date : new Date().toISOString().slice(0,10);
+    $('investMemoInput').value = entry ? (entry.memo||'') : '';
+    $('stockAddRow').style.display = 'none';
+    updateInvestTotalPreview();
+    $('investDeleteBtn').style.display = entry ? 'block' : 'none';
+    $('investBackdrop').classList.add('open'); $('investSheet').classList.add('open');
+  }
+  function closeInvestSheet(){ $('investBackdrop').classList.remove('open'); $('investSheet').classList.remove('open'); editingInvestId=null; }
+
+  async function handleInvestSave(){
+    const price = parseFloat($('priceInput').value);
+    const qty = parseFloat($('qtyInput').value);
+    if(!price || price<=0){ showToast('가격을 입력해주세요'); return; }
+    if(!qty || qty<=0){ showToast('수량을 입력해주세요'); return; }
+    if(!selectedStock){ showToast('종목을 선택해주세요'); return; }
+    const date = $('investDateInput').value || new Date().toISOString().slice(0,10);
+    const memo = $('investMemoInput').value.trim();
+
+    const data = {
+      id: editingInvestId || (Date.now().toString(36)+Math.random().toString(36).slice(2,7)),
+      account: investAccount, type: investType, stock: selectedStock, price, qty, date, memo
+    };
+    if(editingInvestId){
+      const idx = investEntries.findIndex(e=>e.id===editingInvestId);
+      if(idx>-1) investEntries[idx] = data;
+    }else{
+      investEntries.push(data);
+    }
+    currentAccount = investAccount;
+    document.querySelectorAll('#accountToggle button').forEach(x=> x.classList.toggle('active', x.dataset.acc===currentAccount));
+    closeInvestSheet(); renderInvest();
+    await saveInvestEntries();
+  }
+  async function handleInvestDelete(){
+    investEntries = investEntries.filter(e=>e.id!==editingInvestId);
+    closeInvestSheet(); renderInvest();
+    await saveInvestEntries();
+  }
+
+  $('investFab').addEventListener('click', ()=> openInvestSheet(null));
+  $('investBackdrop').addEventListener('click', closeInvestSheet);
+  $('investSaveBtn').addEventListener('click', handleInvestSave);
+  $('investDeleteBtn').addEventListener('click', handleInvestDelete);
+
+  // ================= 백업 / 복원 =================
+  $('backupBtn').addEventListener('click', ()=>{
+    $('backupBackdrop').classList.add('open'); $('backupSheet').classList.add('open');
+  });
+  $('backupBackdrop').addEventListener('click', ()=>{
+    $('backupBackdrop').classList.remove('open'); $('backupSheet').classList.remove('open');
+  });
+
+  $('exportBtn').addEventListener('click', ()=>{
+    const payload = JSON.stringify({ version:1, exportedAt:new Date().toISOString(), entries, investEntries, settings }, null, 2);
+    const blob = new Blob([payload], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `가계부_백업_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    showToast('백업 파일을 저장했어요');
+  });
+
+  $('importBtn').addEventListener('click', ()=> $('importFile').click());
+  $('importFile').addEventListener('change', (ev)=>{
+    const file = ev.target.files && ev.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async ()=>{
+      try{
+        const data = JSON.parse(reader.result);
+        if(!data || !Array.isArray(data.entries)) throw new Error('형식 오류');
+        entries = data.entries;
+        investEntries = Array.isArray(data.investEntries) ? data.investEntries : [];
+        settings = Object.assign({}, DEFAULTS, data.settings || {});
+        if(!settings.stocksByAccount) settings.stocksByAccount = { mine: [], wife: [] };
+        await Promise.all([saveEntries(), saveInvestEntries(), saveSettings()]);
+        renderFilterChips(); render(); renderInvest();
+        $('backupBackdrop').classList.remove('open'); $('backupSheet').classList.remove('open');
+        showToast('복원이 완료되었어요');
+      }catch(e){
+        showToast('파일을 읽지 못했어요');
+      }
+    };
+    reader.readAsText(file);
+    ev.target.value = '';
+  });
+
+  loadAll();
+})();
+</script>
+</body>
+</html>
