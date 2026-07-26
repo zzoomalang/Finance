@@ -25,8 +25,8 @@
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;}
-  html{background:var(--ink-2);}
-  body{background:var(--paper); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif; min-height:100vh; padding-bottom:100px;}
+  html{background:var(--ink-2); overscroll-behavior-x:none;}
+  body{background:var(--paper); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif; min-height:100vh; padding-bottom:100px; overscroll-behavior-x:none; touch-action:pan-y;}
   .mono{font-family:'Space Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums;}
   button, input, select{ font-family:inherit; }
 
@@ -111,7 +111,7 @@
 
   .sheet-backdrop{position:fixed; inset:0; background:rgba(20,24,20,0.4); opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:40;}
   .sheet-backdrop.open{opacity:1; pointer-events:auto;}
-  .sheet{position:fixed; left:0; right:0; bottom:0; z-index:41; background:var(--paper); border-radius:20px 20px 0 0; padding:10px 18px calc(20px + env(safe-area-inset-bottom)); transform:translateY(105%); transition:transform .25s cubic-bezier(.32,.72,0,1); max-height:90vh; overflow-y:auto;}
+  .sheet{position:fixed; left:0; right:0; bottom:0; z-index:41; background:var(--paper); border-radius:20px 20px 0 0; padding:10px 18px calc(20px + env(safe-area-inset-bottom)); transform:translateY(105%); transition:transform .25s cubic-bezier(.32,.72,0,1); max-height:90vh; overflow-y:auto; overflow-x:hidden; touch-action:pan-y; overscroll-behavior:contain;}
   .sheet.open{transform:translateY(0);}
   .sheet-handle{width:36px; height:4px; background:var(--line); border-radius:4px; margin:6px auto 14px;}
   .sheet-title{font-size:15px; font-weight:700; margin-bottom:14px;}
@@ -293,23 +293,30 @@
   </div>
 
   <div class="field" id="sharedSettleField" style="display:none;">
-    <label>정산월</label>
-    <div class="toggle3" id="sharedSettleGrid">
-      <button type="button" data-offset="-1">전월분</button>
-      <button type="button" data-offset="0" class="active">당월분</button>
-      <button type="button" data-offset="1">익월분</button>
-    </div>
+    <label>정산월 (자동 계산)</label>
     <small class="preview-text" id="sharedSettlePreview"></small>
   </div>
 
-  <div class="field" id="wifeSettleField" style="display:none;">
-    <label>정산월</label>
-    <div class="toggle3" id="wifeSettleGrid">
-      <button type="button" data-offset="-1">전월분</button>
-      <button type="button" data-offset="0" class="active">당월분</button>
-      <button type="button" data-offset="1">익월분</button>
+  <div class="field" id="sharedPaymentField" style="display:none;">
+    <label>결제 수단</label>
+    <div class="toggle2" id="sharedPaymentToggle">
+      <button type="button" data-val="card" class="active">카드</button>
+      <button type="button" data-val="cash">현금</button>
     </div>
-    <small class="preview-text" id="wifeSettlePreview">전월에 낸 공통비를 나중에 받을 때는 '전월분'을 선택하세요.</small>
+  </div>
+
+  <div class="field" id="sharedCardCoField" style="display:none;">
+    <label>카드사</label>
+    <div class="chip-grid" id="sharedCardCoChips"></div>
+    <div class="add-row" id="sharedCardCoAddRow" style="display:none;">
+      <input type="text" class="text-input" id="sharedCardCoAddInput" placeholder="카드사 이름">
+      <button type="button" id="sharedCardCoAddBtn">추가</button>
+    </div>
+  </div>
+
+  <div class="field" id="wifeSettleField" style="display:none;">
+    <label>정산월 (자동 계산)</label>
+    <small class="preview-text" id="wifeSettlePreview"></small>
   </div>
 
   <div class="field" id="personalCatField" style="display:none;">
@@ -485,8 +492,8 @@
   let selectedPersonalCat = null;
   let selectedCardCo = null;
   let paymentMethod = 'card';
-  let sharedSettleOffset = 0;
-  let wifeSettleOffset = 0;
+  let sharedPaymentMethod = 'card';
+  let selectedSharedCardCo = null;
   let currentFilter = 'all';
 
   let currentAccount = 'mine';
@@ -496,6 +503,23 @@
   let selectedStock = null;
 
   function fmt(n){ return Math.round(n||0).toLocaleString('ko-KR'); }
+  let lockedScrollY = 0;
+  function lockBodyScroll(){
+    lockedScrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${lockedScrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+  }
+  function unlockBodyScroll(){
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, lockedScrollY);
+  }
   function won(n){ return '₩' + fmt(n); }
   function showToast(msg){
     const t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -515,7 +539,7 @@
     return day>=14 ? addMonths(ym,1) : ym;
   }
   function effectiveMonth(e){
-    if(e.kind==='wife_gift' || e.kind==='shared_expense') return addMonths(e.date.slice(0,7), e.settleOffset||0);
+    if(e.kind==='wife_gift' || e.kind==='shared_expense') return cardPaymentMonth(e.date);
     if(e.kind==='personal_expense' && e.paymentMethod==='card') return cardPaymentMonth(e.date);
     return e.date.slice(0,7);
   }
@@ -643,7 +667,7 @@
     const wr = $('wifeRemaining'); wr.textContent = (t.wifeRemaining>=0?'+':'') + fmt(t.wifeRemaining);
     wr.className = 'val mono ' + (t.wifeRemaining>=0?'pos':'neg');
 
-    const cardEntries = mEntries.filter(e=> e.kind==='personal_expense' && e.paymentMethod==='card');
+    const cardEntries = mEntries.filter(e=> (e.kind==='personal_expense' || e.kind==='shared_expense') && e.paymentMethod==='card');
     if(cardEntries.length===0){
       $('cardPanel').style.display = 'none';
     }else{
@@ -685,14 +709,15 @@
         if(e.kind==='income'){ title = e.memo || '내 수입'; sub = '수입'; amtClass='plus'; amtPrefix='+'; }
         else if(e.kind==='wife_gift'){
           title = e.memo || '와이프 지원금';
-          const note = e.settleOffset<0 ? '전월분 정산' : (e.settleOffset>0 ? '익월분 정산' : '당월분 정산');
+          const note = `정산 ${fmtMonth(cardPaymentMonth(e.date))}.25`;
           sub = note + (e.memo? ' · '+e.memo : '');
           amtClass='plus'; amtPrefix='+';
         }
         else if(e.kind==='shared_expense'){
           title = e.category || '공통지출';
-          const note = e.settleOffset<0 ? '전월분' : (e.settleOffset>0 ? '익월분' : '당월분');
-          sub = `공통 · 나 ${e.ratioMine}% / 와이프 ${100-e.ratioMine}% · ${note}` + (e.memo? ' · '+e.memo : '');
+          const note = `정산 ${fmtMonth(cardPaymentMonth(e.date))}.25`;
+          const payNote = e.paymentMethod==='cash' ? '현금' : (e.paymentMethod==='card' ? (e.cardCompany||'카드') : '');
+          sub = `공통 · 나 ${e.ratioMine}% / 와이프 ${100-e.ratioMine}% · ${note}` + (payNote? ' · '+payNote : '') + (e.memo? ' · '+e.memo : '');
           amtClass='minus'; amtPrefix='-';
           amtSub = `내 몫 ${fmt(e.amount*e.ratioMine/100)}`;
         } else {
@@ -750,6 +775,9 @@
   function refreshCardCoChips(){
     renderChips('cardCoChips','cardCoAddRow', settings.cardCompanies, selectedCardCo, (v)=>{ selectedCardCo=v; refreshCardCoChips(); updateDateDependentPreviews(); });
   }
+  function refreshSharedCardCoChips(){
+    renderChips('sharedCardCoChips','sharedCardCoAddRow', settings.cardCompanies, selectedSharedCardCo, (v)=>{ selectedSharedCardCo=v; refreshSharedCardCoChips(); });
+  }
 
   $('sharedCatAddBtn').addEventListener('click', ()=>{
     const v = $('sharedCatAddInput').value.trim();
@@ -773,6 +801,23 @@
     refreshCardCoChips(); saveSettings();
   });
 
+  $('sharedCardCoAddBtn').addEventListener('click', ()=>{
+    const v = $('sharedCardCoAddInput').value.trim();
+    if(!v) return;
+    if(!settings.cardCompanies.includes(v)) settings.cardCompanies.push(v);
+    selectedSharedCardCo = v; $('sharedCardCoAddInput').value=''; $('sharedCardCoAddRow').style.display='none';
+    refreshSharedCardCoChips(); saveSettings();
+  });
+
+  document.querySelectorAll('#sharedPaymentToggle button').forEach(b=> b.addEventListener('click', ()=>{
+    sharedPaymentMethod = b.dataset.val;
+    syncSharedPaymentUI();
+  }));
+  function syncSharedPaymentUI(){
+    document.querySelectorAll('#sharedPaymentToggle button').forEach(b=> b.classList.toggle('active', b.dataset.val===sharedPaymentMethod));
+    $('sharedCardCoField').style.display = sharedPaymentMethod==='card' ? 'block' : 'none';
+  }
+
   function updateRatioDisplay(){
     const mine = parseInt($('ratioRange').value,10);
     $('ratioMineNum').textContent = mine;
@@ -784,23 +829,11 @@
   $('ratioRange').addEventListener('input', updateRatioDisplay);
   $('amountInput').addEventListener('input', updateRatioDisplay);
 
-  function syncSettleUI(which){
-    const offset = which==='shared' ? sharedSettleOffset : wifeSettleOffset;
-    const gridId = which==='shared' ? 'sharedSettleGrid' : 'wifeSettleGrid';
-    document.querySelectorAll('#'+gridId+' button').forEach(b=> b.classList.toggle('active', parseInt(b.dataset.offset,10)===offset));
-  }
-  document.querySelectorAll('#sharedSettleGrid button').forEach(b=> b.addEventListener('click', ()=>{
-    sharedSettleOffset = parseInt(b.dataset.offset,10); syncSettleUI('shared'); updateDateDependentPreviews();
-  }));
-  document.querySelectorAll('#wifeSettleGrid button').forEach(b=> b.addEventListener('click', ()=>{
-    wifeSettleOffset = parseInt(b.dataset.offset,10); syncSettleUI('wife'); updateDateDependentPreviews();
-  }));
-
   function updateDateDependentPreviews(){
     const date = $('dateInput').value || new Date().toISOString().slice(0,10);
-    const dm = date.slice(0,7);
-    $('sharedSettlePreview').textContent = `→ ${fmtMonth(addMonths(dm, sharedSettleOffset))} 정산에 반영`;
-    $('wifeSettlePreview').textContent = `→ ${fmtMonth(addMonths(dm, wifeSettleOffset))} 정산에 반영 · 전월에 낸 공통비를 나중에 받을 땐 '전월분'`;
+    const sm = cardPaymentMonth(date);
+    $('sharedSettlePreview').textContent = `${fmtMonth(sm)}.25 정산 (이용기간 14일~다음달 13일 기준 자동계산)`;
+    $('wifeSettlePreview').textContent = `${fmtMonth(sm)}.25 정산에 반영`;
     if(paymentMethod==='card'){
       $('cardPayPreview').textContent = `카드 결제일: ${fmtMonth(cardPaymentMonth(date))}.25 (이용기간 14일~다음달 13일 기준 자동계산)`;
     }
@@ -821,12 +854,14 @@
     $('sharedCatField').style.display = kind==='shared_expense' ? 'block' : 'none';
     $('ratioField').style.display = kind==='shared_expense' ? 'block' : 'none';
     $('sharedSettleField').style.display = kind==='shared_expense' ? 'block' : 'none';
+    $('sharedPaymentField').style.display = kind==='shared_expense' ? 'block' : 'none';
+    $('sharedCardCoField').style.display = (kind==='shared_expense' && sharedPaymentMethod==='card') ? 'block' : 'none';
     $('wifeSettleField').style.display = kind==='wife_gift' ? 'block' : 'none';
     $('personalCatField').style.display = kind==='personal_expense' ? 'block' : 'none';
     $('paymentField').style.display = kind==='personal_expense' ? 'block' : 'none';
     $('cardCoField').style.display = (kind==='personal_expense' && paymentMethod==='card') ? 'block' : 'none';
-    if(kind==='shared_expense'){ refreshSharedCatChips(); updateRatioDisplay(); syncSettleUI('shared'); }
-    if(kind==='wife_gift'){ syncSettleUI('wife'); }
+    if(kind==='shared_expense'){ refreshSharedCatChips(); updateRatioDisplay(); syncSharedPaymentUI(); refreshSharedCardCoChips(); }
+    if(kind==='wife_gift'){ /* 정산월은 날짜로 자동 계산됨 */ }
     if(kind==='personal_expense'){ refreshPersonalCatChips(); refreshCardCoChips(); syncPaymentUI(); }
     updateDateDependentPreviews();
   }
@@ -837,24 +872,26 @@
     $('amountInput').value = entry ? entry.amount : '';
     $('dateInput').value = entry ? entry.date : new Date().toISOString().slice(0,10);
     $('memoInput').value = entry ? (entry.memo||'') : '';
-    $('sharedCatAddRow').style.display='none'; $('personalCatAddRow').style.display='none'; $('cardCoAddRow').style.display='none';
+    $('sharedCatAddRow').style.display='none'; $('personalCatAddRow').style.display='none'; $('cardCoAddRow').style.display='none'; $('sharedCardCoAddRow').style.display='none';
 
     if(entry){
-      if(entry.kind==='shared_expense'){ selectedSharedCat = entry.category; $('ratioRange').value = entry.ratioMine; sharedSettleOffset = entry.settleOffset||0; }
-      if(entry.kind==='wife_gift'){ wifeSettleOffset = entry.settleOffset||0; }
+      if(entry.kind==='shared_expense'){
+        selectedSharedCat = entry.category; $('ratioRange').value = entry.ratioMine;
+        sharedPaymentMethod = entry.paymentMethod||'card'; selectedSharedCardCo = entry.cardCompany||null;
+      }
       if(entry.kind==='personal_expense'){ selectedPersonalCat = entry.category; paymentMethod = entry.paymentMethod||'card'; selectedCardCo = entry.cardCompany||null; }
       setKind(entry.kind);
     }else{
       selectedSharedCat = null; selectedPersonalCat = null; selectedCardCo = null;
       $('ratioRange').value = settings.ratioMine; paymentMethod='card';
-      sharedSettleOffset = 0; wifeSettleOffset = 0;
+      sharedPaymentMethod = 'card'; selectedSharedCardCo = null;
       setKind('income');
     }
     updateRatioDisplay();
     $('deleteBtn').style.display = entry ? 'block' : 'none';
-    $('backdrop').classList.add('open'); $('sheet').classList.add('open');
+    $('backdrop').classList.add('open'); $('sheet').classList.add('open'); lockBodyScroll();
   }
-  function closeSheet(){ $('backdrop').classList.remove('open'); $('sheet').classList.remove('open'); editingId=null; }
+  function closeSheet(){ $('backdrop').classList.remove('open'); $('sheet').classList.remove('open'); editingId=null; unlockBodyScroll(); }
 
   async function handleSave(){
     const amount = parseFloat($('amountInput').value);
@@ -868,9 +905,11 @@
       if(!selectedSharedCat){ showToast('공통비 항목을 선택해주세요'); return; }
       data.category = selectedSharedCat;
       data.ratioMine = parseInt($('ratioRange').value,10);
-      data.settleOffset = sharedSettleOffset;
-    }else if(currentKind==='wife_gift'){
-      data.settleOffset = wifeSettleOffset;
+      data.paymentMethod = sharedPaymentMethod;
+      if(sharedPaymentMethod==='card'){
+        if(!selectedSharedCardCo){ showToast('카드사를 선택해주세요'); return; }
+        data.cardCompany = selectedSharedCardCo;
+      }
     }else if(currentKind==='personal_expense'){
       if(!selectedPersonalCat){ showToast('지출 항목을 선택해주세요'); return; }
       data.category = selectedPersonalCat;
@@ -907,17 +946,17 @@
 
   $('gearBtn').addEventListener('click', ()=>{
     $('defaultRatioInput').value = settings.ratioMine;
-    $('settingsBackdrop').classList.add('open'); $('settingsSheet').classList.add('open');
+    $('settingsBackdrop').classList.add('open'); $('settingsSheet').classList.add('open'); lockBodyScroll();
   });
   $('settingsBackdrop').addEventListener('click', ()=>{
-    $('settingsBackdrop').classList.remove('open'); $('settingsSheet').classList.remove('open');
+    $('settingsBackdrop').classList.remove('open'); $('settingsSheet').classList.remove('open'); unlockBodyScroll();
   });
   $('settingsSaveBtn').addEventListener('click', async ()=>{
     let v = parseInt($('defaultRatioInput').value,10);
     if(isNaN(v) || v<0 || v>100) v = 60;
     settings.ratioMine = v;
     await saveSettings();
-    $('settingsBackdrop').classList.remove('open'); $('settingsSheet').classList.remove('open');
+    $('settingsBackdrop').classList.remove('open'); $('settingsSheet').classList.remove('open'); unlockBodyScroll();
     showToast('설정이 저장되었어요');
   });
 
@@ -1049,9 +1088,9 @@
     $('stockAddRow').style.display = 'none';
     updateInvestTotalPreview();
     $('investDeleteBtn').style.display = entry ? 'block' : 'none';
-    $('investBackdrop').classList.add('open'); $('investSheet').classList.add('open');
+    $('investBackdrop').classList.add('open'); $('investSheet').classList.add('open'); lockBodyScroll();
   }
-  function closeInvestSheet(){ $('investBackdrop').classList.remove('open'); $('investSheet').classList.remove('open'); editingInvestId=null; }
+  function closeInvestSheet(){ $('investBackdrop').classList.remove('open'); $('investSheet').classList.remove('open'); editingInvestId=null; unlockBodyScroll(); }
 
   async function handleInvestSave(){
     const price = parseFloat($('priceInput').value);
@@ -1090,10 +1129,10 @@
 
   // ================= 백업 / 복원 =================
   $('backupBtn').addEventListener('click', ()=>{
-    $('backupBackdrop').classList.add('open'); $('backupSheet').classList.add('open');
+    $('backupBackdrop').classList.add('open'); $('backupSheet').classList.add('open'); lockBodyScroll();
   });
   $('backupBackdrop').addEventListener('click', ()=>{
-    $('backupBackdrop').classList.remove('open'); $('backupSheet').classList.remove('open');
+    $('backupBackdrop').classList.remove('open'); $('backupSheet').classList.remove('open'); unlockBodyScroll();
   });
 
   $('exportBtn').addEventListener('click', ()=>{
@@ -1123,7 +1162,7 @@
         if(!settings.stocksByAccount) settings.stocksByAccount = { mine: [], wife: [] };
         await Promise.all([saveEntries(), saveInvestEntries(), saveSettings()]);
         renderFilterChips(); render(); renderInvest();
-        $('backupBackdrop').classList.remove('open'); $('backupSheet').classList.remove('open');
+        $('backupBackdrop').classList.remove('open'); $('backupSheet').classList.remove('open'); unlockBodyScroll();
         showToast('복원이 완료되었어요');
       }catch(e){
         showToast('파일을 읽지 못했어요');
@@ -1132,6 +1171,35 @@
     reader.readAsText(file);
     ev.target.value = '';
   });
+
+  // ================= 시트 아래로 스크롤/드래그 시 닫기 =================
+  function makeSheetDismissible(sheetEl, onClose){
+    let startY = 0, dy = 0, dragging = false;
+    sheetEl.addEventListener('touchstart', (e)=>{
+      if(sheetEl.scrollTop > 0){ dragging = false; return; }
+      startY = e.touches[0].clientY; dy = 0; dragging = true;
+      sheetEl.style.transition = 'none';
+    }, {passive:true});
+    sheetEl.addEventListener('touchmove', (e)=>{
+      if(!dragging) return;
+      if(sheetEl.scrollTop > 0){ dragging = false; sheetEl.style.transform=''; return; }
+      dy = e.touches[0].clientY - startY;
+      if(dy < 0) dy = 0;
+      sheetEl.style.transform = `translateY(${dy}px)`;
+    }, {passive:true});
+    sheetEl.addEventListener('touchend', ()=>{
+      if(!dragging) return;
+      sheetEl.style.transition = '';
+      sheetEl.style.transform = '';
+      dragging = false;
+      if(dy > 90) onClose();
+      dy = 0;
+    });
+  }
+  makeSheetDismissible($('sheet'), closeSheet);
+  makeSheetDismissible($('investSheet'), closeInvestSheet);
+  makeSheetDismissible($('settingsSheet'), ()=>{ $('settingsBackdrop').classList.remove('open'); $('settingsSheet').classList.remove('open'); unlockBodyScroll(); });
+  makeSheetDismissible($('backupSheet'), ()=>{ $('backupBackdrop').classList.remove('open'); $('backupSheet').classList.remove('open'); unlockBodyScroll(); });
 
   loadAll();
 })();
