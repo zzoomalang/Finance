@@ -303,11 +303,6 @@
     </div>
   </div>
 
-  <div class="field" id="sharedSettleField" style="display:none;">
-    <label>정산월 (자동 계산)</label>
-    <small class="preview-text" id="sharedSettlePreview"></small>
-  </div>
-
   <div class="field" id="sharedPaymentField" style="display:none;">
     <label>결제 수단</label>
     <div class="toggle2" id="sharedPaymentToggle">
@@ -323,6 +318,17 @@
       <input type="text" class="text-input" id="sharedCardCoAddInput" placeholder="카드사 이름">
       <button type="button" id="sharedCardCoAddBtn">추가</button>
     </div>
+  </div>
+
+  <div class="field" id="sharedSettleField" style="display:none;">
+    <label>정산월 (자동 계산)</label>
+    <small class="preview-text" id="sharedSettlePreview"></small>
+  </div>
+
+  <div class="field" id="sharedCashMonthField" style="display:none;">
+    <label>귀속월 (직접 선택)</label>
+    <input type="month" class="date-input" id="sharedCashMonthInput">
+    <small class="preview-text">현금 지출은 정산 규칙 없이, 원하는 달에 직접 반영할 수 있어요.</small>
   </div>
 
   <div class="field" id="wifeSettleField" style="display:none;">
@@ -531,6 +537,7 @@
   let paymentMethod = 'card';
   let sharedPaymentMethod = 'card';
   let selectedSharedCardCo = null;
+  let sharedCashMonthTouched = false;
   let currentFilter = 'all';
   let listGroupMode = 'date';
 
@@ -579,7 +586,10 @@
   function wifeGiftSettleMonth(dateStr){ return addMonths(dateStr.slice(0,7), -1); }
   function effectiveMonth(e){
     if(e.kind==='wife_gift') return wifeGiftSettleMonth(e.date);
-    if(e.kind==='shared_expense') return cardPaymentMonth(e.date);
+    if(e.kind==='shared_expense'){
+      if(e.paymentMethod==='cash' && e.manualSettleMonth) return e.manualSettleMonth;
+      return cardPaymentMonth(e.date);
+    }
     if(e.kind==='personal_expense' && e.paymentMethod==='card') return cardPaymentMonth(e.date);
     return e.date.slice(0,7);
   }
@@ -756,7 +766,8 @@
       }
       else if(e.kind==='shared_expense'){
         title = e.category || '공통지출';
-        const note = `정산 ${fmtMonth(cardPaymentMonth(e.date))}.25`;
+        const settleYm = (e.paymentMethod==='cash' && e.manualSettleMonth) ? e.manualSettleMonth : cardPaymentMonth(e.date);
+        const note = e.paymentMethod==='cash' ? `귀속 ${fmtMonth(settleYm)}` : `정산 ${fmtMonth(settleYm)}.25`;
         const payNote = e.paymentMethod==='cash' ? '현금' : (e.paymentMethod==='card' ? (e.cardCompany||'카드') : '');
         sub = dateTag + `공통 · 나 ${e.ratioMine}% / 와이프 ${100-e.ratioMine}% · ${note}` + (payNote? ' · '+payNote : '') + (e.memo? ' · '+e.memo : '');
         amtClass='minus'; amtPrefix='-';
@@ -911,7 +922,14 @@
   function syncSharedPaymentUI(){
     document.querySelectorAll('#sharedPaymentToggle button').forEach(b=> b.classList.toggle('active', b.dataset.val===sharedPaymentMethod));
     $('sharedCardCoField').style.display = sharedPaymentMethod==='card' ? 'block' : 'none';
+    $('sharedSettleField').style.display = sharedPaymentMethod==='card' ? 'block' : 'none';
+    $('sharedCashMonthField').style.display = sharedPaymentMethod==='cash' ? 'block' : 'none';
+    if(sharedPaymentMethod==='cash' && !sharedCashMonthTouched){
+      const date = $('dateInput').value || new Date().toISOString().slice(0,10);
+      $('sharedCashMonthInput').value = cardPaymentMonth(date);
+    }
   }
+  $('sharedCashMonthInput').addEventListener('input', ()=>{ sharedCashMonthTouched = true; });
 
   function updateRatioDisplay(){
     const mine = parseInt($('ratioRange').value,10);
@@ -944,6 +962,9 @@
     if(paymentMethod==='card'){
       $('cardPayPreview').textContent = `카드 결제일: ${fmtMonth(cardPaymentMonth(date))}.25 (이용기간 14일~다음달 13일 기준 자동계산)`;
     }
+    if(sharedPaymentMethod==='cash' && !sharedCashMonthTouched){
+      $('sharedCashMonthInput').value = sm;
+    }
   }
   $('dateInput').addEventListener('input', updateDateDependentPreviews);
 
@@ -960,9 +981,8 @@
     document.querySelectorAll('.kind-btn').forEach(b=> b.classList.toggle('active', b.dataset.kind===kind));
     $('sharedCatField').style.display = kind==='shared_expense' ? 'block' : 'none';
     $('ratioField').style.display = kind==='shared_expense' ? 'block' : 'none';
-    $('sharedSettleField').style.display = kind==='shared_expense' ? 'block' : 'none';
     $('sharedPaymentField').style.display = kind==='shared_expense' ? 'block' : 'none';
-    $('sharedCardCoField').style.display = (kind==='shared_expense' && sharedPaymentMethod==='card') ? 'block' : 'none';
+    if(kind!=='shared_expense'){ $('sharedCardCoField').style.display='none'; $('sharedSettleField').style.display='none'; $('sharedCashMonthField').style.display='none'; }
     $('wifeSettleField').style.display = kind==='wife_gift' ? 'block' : 'none';
     $('housingCatField').style.display = kind==='housing_living' ? 'block' : 'none';
     $('housingRatioField').style.display = kind==='housing_living' ? 'block' : 'none';
@@ -988,6 +1008,12 @@
       if(entry.kind==='shared_expense'){
         selectedSharedCat = entry.category; $('ratioRange').value = entry.ratioMine;
         sharedPaymentMethod = entry.paymentMethod||'card'; selectedSharedCardCo = entry.cardCompany||null;
+        if(entry.paymentMethod==='cash'){
+          $('sharedCashMonthInput').value = entry.manualSettleMonth || cardPaymentMonth(entry.date);
+          sharedCashMonthTouched = true;
+        }else{
+          sharedCashMonthTouched = false;
+        }
       }
       if(entry.kind==='housing_living'){ selectedHousingCat = entry.category; $('housingRatioRange').value = entry.ratioMine; }
       if(entry.kind==='personal_expense'){ selectedPersonalCat = entry.category; paymentMethod = entry.paymentMethod||'card'; selectedCardCo = entry.cardCompany||null; }
@@ -995,7 +1021,7 @@
     }else{
       selectedSharedCat = null; selectedPersonalCat = null; selectedCardCo = null; selectedHousingCat = null;
       $('ratioRange').value = settings.ratioMine; $('housingRatioRange').value = settings.ratioMine; paymentMethod='card';
-      sharedPaymentMethod = 'card'; selectedSharedCardCo = null;
+      sharedPaymentMethod = 'card'; selectedSharedCardCo = null; sharedCashMonthTouched = false;
       setKind('income');
     }
     updateRatioDisplay();
@@ -1021,6 +1047,8 @@
       if(sharedPaymentMethod==='card'){
         if(!selectedSharedCardCo){ showToast('카드사를 선택해주세요'); return; }
         data.cardCompany = selectedSharedCardCo;
+      }else{
+        data.manualSettleMonth = $('sharedCashMonthInput').value || cardPaymentMonth(date);
       }
     }else if(currentKind==='housing_living'){
       if(!selectedHousingCat){ showToast('항목을 선택해주세요'); return; }
