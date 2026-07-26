@@ -127,12 +127,14 @@
   .kind-btn.active[data-kind="wife_gift"]{background:var(--wife-bg); border-color:var(--wife); color:var(--wife);}
   .kind-btn.active[data-kind="shared_expense"]{background:#E9ECF3; border-color:var(--ink); color:var(--ink);}
   .kind-btn.active[data-kind="personal_expense"]{background:var(--red-bg); border-color:var(--red); color:var(--red);}
+  .kind-btn.active[data-kind="housing_living"]{background:#EFE7DE; border-color:#7A5B3A; color:#7A5B3A;}
 
   .field{margin-bottom:15px;}
   .field label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;}
   .amount-input{width:100%; border:none; border-bottom:2px solid var(--line); background:transparent; font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif; font-size:26px; font-weight:700; padding:4px 0; outline:none; color:var(--text);}
   .amount-input:focus{border-bottom-color:var(--ink);}
-  .text-input,.date-input,.num-input{width:100%; border:1px solid var(--line); border-radius:10px; padding:11px 12px; font-size:14px; background:var(--card); outline:none; color:var(--text);}
+  .text-input,.date-input,.num-input{width:100%; border:1px solid var(--line); border-radius:10px; padding:11px 12px; font-size:14px; background:var(--card); outline:none; color:var(--text); box-sizing:border-box;}
+  .date-input{-webkit-appearance:none; appearance:none; max-width:100%; min-width:0;}
   .text-input:focus,.date-input:focus,.num-input:focus{border-color:var(--ink);}
   .chip-grid{display:flex; flex-wrap:wrap; gap:8px;}
   .chip{border:1px solid var(--line); background:var(--card); border-radius:999px; padding:8px 13px; font-size:13px; color:var(--text); cursor:pointer;}
@@ -264,17 +266,18 @@
   <div class="kind-grid" id="kindGrid">
     <button class="kind-btn" data-kind="income">내 수입<span class="kd-desc">월급, 부수입 등</span></button>
     <button class="kind-btn" data-kind="wife_gift">와이프 지원금<span class="kd-desc">와이프가 주는 돈</span></button>
-    <button class="kind-btn" data-kind="shared_expense">공통 지출<span class="kd-desc">주거비, 가전 등</span></button>
+    <button class="kind-btn" data-kind="shared_expense">공통 지출<span class="kd-desc">가전/가구 등</span></button>
+    <button class="kind-btn" data-kind="housing_living">주거비/생활비<span class="kd-desc">현금주의 · 지출월 귀속</span></button>
     <button class="kind-btn" data-kind="personal_expense">개인 지출<span class="kd-desc">카드 / 현금</span></button>
   </div>
 
   <div class="field">
-    <label>금액</label>
-    <input type="number" inputmode="numeric" class="amount-input" id="amountInput" placeholder="0" min="0">
-  </div>
-  <div class="field">
     <label>날짜</label>
     <input type="date" class="date-input" id="dateInput">
+  </div>
+  <div class="field">
+    <label>금액</label>
+    <input type="number" inputmode="numeric" class="amount-input" id="amountInput" placeholder="0" min="0">
   </div>
 
   <div class="field" id="sharedCatField" style="display:none;">
@@ -325,6 +328,30 @@
   <div class="field" id="wifeSettleField" style="display:none;">
     <label>정산월 (자동 계산)</label>
     <small class="preview-text" id="wifeSettlePreview"></small>
+  </div>
+
+  <div class="field" id="housingCatField" style="display:none;">
+    <label>항목</label>
+    <div class="chip-grid" id="housingCatChips"></div>
+    <div class="add-row" id="housingCatAddRow" style="display:none;">
+      <input type="text" class="text-input" id="housingCatAddInput" placeholder="새 항목 이름">
+      <button type="button" id="housingCatAddBtn">추가</button>
+    </div>
+  </div>
+
+  <div class="field" id="housingRatioField" style="display:none;">
+    <label>부담 비율</label>
+    <div class="ratio-box">
+      <div class="ratio-inputs">
+        <span class="who">나</span>
+        <input type="range" id="housingRatioRange" min="0" max="100" step="5" value="60">
+        <span class="who">와이프</span>
+      </div>
+      <div class="ratio-nums"><span>나 <b id="housingRatioMineNum">60</b>%</span><span>와이프 <b id="housingRatioWifeNum">40</b>%</span></div>
+      <div class="ratio-split"><span>내 몫</span><b id="housingRatioMineAmt">₩0</b></div>
+      <div class="ratio-split"><span>와이프 몫</span><b id="housingRatioWifeAmt">₩0</b></div>
+    </div>
+    <small class="preview-text">현금주의: 지출한 날짜가 속한 달에 바로 반영돼요 (정산 지연 없음)</small>
   </div>
 
   <div class="field" id="personalCatField" style="display:none;">
@@ -483,7 +510,8 @@
   const $ = id => document.getElementById(id);
   const DEFAULTS = {
     ratioMine: 60,
-    sharedCategories: ['주거비용 (전세이자·관리비)','가전/가구'],
+    sharedCategories: ['가전/가구'],
+    housingCategories: ['주거비 (전세이자·관리비)','생활비'],
     personalCategories: ['식비','교통','생활','쇼핑','문화/여가','기타'],
     cardCompanies: ['신한카드','삼성카드','현대카드','국민카드','우리카드','롯데카드','하나카드','NH농협카드'],
     stocksByAccount: { mine: [], wife: [] }
@@ -497,6 +525,7 @@
   let editingId = null;
   let currentKind = null;
   let selectedSharedCat = null;
+  let selectedHousingCat = null;
   let selectedPersonalCat = null;
   let selectedCardCo = null;
   let paymentMethod = 'card';
@@ -586,6 +615,8 @@
       entries = eVal ? JSON.parse(eVal) : [];
       settings = sVal ? Object.assign({}, DEFAULTS, JSON.parse(sVal)) : JSON.parse(JSON.stringify(DEFAULTS));
       if(!settings.stocksByAccount) settings.stocksByAccount = { mine: [], wife: [] };
+      if(!settings.housingCategories) settings.housingCategories = ['주거비 (전세이자·관리비)','생활비'];
+      if(settings.sharedCategories) settings.sharedCategories = settings.sharedCategories.filter(c => c !== '주거비용 (전세이자·관리비)');
       investEntries = iVal ? JSON.parse(iVal) : [];
     }catch(e){
       entries = []; investEntries = []; settings = JSON.parse(JSON.stringify(DEFAULTS));
@@ -623,8 +654,8 @@
                   .sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   }
 
-  const KIND_LABEL = {income:'수입', wife_gift:'와이프', shared_expense:'공통', personal_expense:'개인'};
-  const KIND_COLOR = {income:'#2F6E51', wife_gift:'#6B4C6E', shared_expense:'#1B2A4A', personal_expense:'#B8402B'};
+  const KIND_LABEL = {income:'수입', wife_gift:'와이프', shared_expense:'공통', personal_expense:'개인', housing_living:'생활'};
+  const KIND_COLOR = {income:'#2F6E51', wife_gift:'#6B4C6E', shared_expense:'#1B2A4A', personal_expense:'#B8402B', housing_living:'#7A5B3A'};
 
   function renderFilterChips(){
     const chips = [
@@ -632,6 +663,7 @@
       {key:'income', label:'내 수입'},
       {key:'wife_gift', label:'와이프 지원'},
       {key:'shared_expense', label:'공통지출'},
+      {key:'housing_living', label:'주거비/생활비'},
       {key:'personal_expense', label:'개인지출'}
     ];
     const wrap = $('filterChips'); wrap.innerHTML = '';
@@ -655,7 +687,7 @@
     mEntries.forEach(e=>{
       if(e.kind==='income') mineIncome += e.amount;
       else if(e.kind==='wife_gift') wifeGiven += e.amount;
-      else if(e.kind==='shared_expense'){ sharedTotal += e.amount; mineSharedShare += e.amount*(e.ratioMine/100); }
+      else if(e.kind==='shared_expense' || e.kind==='housing_living'){ sharedTotal += e.amount; mineSharedShare += e.amount*(e.ratioMine/100); }
       else if(e.kind==='personal_expense') minePersonal += e.amount;
     });
     const wifeSharedShare = sharedTotal - mineSharedShare;
@@ -727,6 +759,11 @@
         const note = `정산 ${fmtMonth(cardPaymentMonth(e.date))}.25`;
         const payNote = e.paymentMethod==='cash' ? '현금' : (e.paymentMethod==='card' ? (e.cardCompany||'카드') : '');
         sub = dateTag + `공통 · 나 ${e.ratioMine}% / 와이프 ${100-e.ratioMine}% · ${note}` + (payNote? ' · '+payNote : '') + (e.memo? ' · '+e.memo : '');
+        amtClass='minus'; amtPrefix='-';
+        amtSub = `내 몫 ${fmt(e.amount*e.ratioMine/100)}`;
+      } else if(e.kind==='housing_living'){
+        title = e.category || '주거비/생활비';
+        sub = dateTag + `주거비/생활비 · 나 ${e.ratioMine}% / 와이프 ${100-e.ratioMine}%` + (e.memo? ' · '+e.memo : '');
         amtClass='minus'; amtPrefix='-';
         amtSub = `내 몫 ${fmt(e.amount*e.ratioMine/100)}`;
       } else {
@@ -817,6 +854,9 @@
   function refreshSharedCatChips(){
     renderChips('sharedCatChips','sharedCatAddRow', settings.sharedCategories, selectedSharedCat, (v)=>{ selectedSharedCat=v; refreshSharedCatChips(); });
   }
+  function refreshHousingCatChips(){
+    renderChips('housingCatChips','housingCatAddRow', settings.housingCategories, selectedHousingCat, (v)=>{ selectedHousingCat=v; refreshHousingCatChips(); });
+  }
   function refreshPersonalCatChips(){
     renderChips('personalCatChips','personalCatAddRow', settings.personalCategories, selectedPersonalCat, (v)=>{ selectedPersonalCat=v; refreshPersonalCatChips(); });
   }
@@ -833,6 +873,13 @@
     if(!settings.sharedCategories.includes(v)) settings.sharedCategories.push(v);
     selectedSharedCat = v; $('sharedCatAddInput').value=''; $('sharedCatAddRow').style.display='none';
     refreshSharedCatChips(); saveSettings();
+  });
+  $('housingCatAddBtn').addEventListener('click', ()=>{
+    const v = $('housingCatAddInput').value.trim();
+    if(!v) return;
+    if(!settings.housingCategories.includes(v)) settings.housingCategories.push(v);
+    selectedHousingCat = v; $('housingCatAddInput').value=''; $('housingCatAddRow').style.display='none';
+    refreshHousingCatChips(); saveSettings();
   });
   $('personalCatAddBtn').addEventListener('click', ()=>{
     const v = $('personalCatAddInput').value.trim();
@@ -877,6 +924,17 @@
   $('ratioRange').addEventListener('input', updateRatioDisplay);
   $('amountInput').addEventListener('input', updateRatioDisplay);
 
+  function updateHousingRatioDisplay(){
+    const mine = parseInt($('housingRatioRange').value,10);
+    $('housingRatioMineNum').textContent = mine;
+    $('housingRatioWifeNum').textContent = 100-mine;
+    const amount = parseFloat($('amountInput').value) || 0;
+    $('housingRatioMineAmt').textContent = won(amount*mine/100);
+    $('housingRatioWifeAmt').textContent = won(amount*(100-mine)/100);
+  }
+  $('housingRatioRange').addEventListener('input', updateHousingRatioDisplay);
+  $('amountInput').addEventListener('input', updateHousingRatioDisplay);
+
   function updateDateDependentPreviews(){
     const date = $('dateInput').value || new Date().toISOString().slice(0,10);
     const sm = cardPaymentMonth(date);
@@ -906,11 +964,14 @@
     $('sharedPaymentField').style.display = kind==='shared_expense' ? 'block' : 'none';
     $('sharedCardCoField').style.display = (kind==='shared_expense' && sharedPaymentMethod==='card') ? 'block' : 'none';
     $('wifeSettleField').style.display = kind==='wife_gift' ? 'block' : 'none';
+    $('housingCatField').style.display = kind==='housing_living' ? 'block' : 'none';
+    $('housingRatioField').style.display = kind==='housing_living' ? 'block' : 'none';
     $('personalCatField').style.display = kind==='personal_expense' ? 'block' : 'none';
     $('paymentField').style.display = kind==='personal_expense' ? 'block' : 'none';
     $('cardCoField').style.display = (kind==='personal_expense' && paymentMethod==='card') ? 'block' : 'none';
     if(kind==='shared_expense'){ refreshSharedCatChips(); updateRatioDisplay(); syncSharedPaymentUI(); refreshSharedCardCoChips(); }
     if(kind==='wife_gift'){ /* 정산월은 날짜로 자동 계산됨 */ }
+    if(kind==='housing_living'){ refreshHousingCatChips(); updateHousingRatioDisplay(); }
     if(kind==='personal_expense'){ refreshPersonalCatChips(); refreshCardCoChips(); syncPaymentUI(); }
     updateDateDependentPreviews();
   }
@@ -921,22 +982,24 @@
     $('amountInput').value = entry ? entry.amount : '';
     $('dateInput').value = entry ? entry.date : new Date().toISOString().slice(0,10);
     $('memoInput').value = entry ? (entry.memo||'') : '';
-    $('sharedCatAddRow').style.display='none'; $('personalCatAddRow').style.display='none'; $('cardCoAddRow').style.display='none'; $('sharedCardCoAddRow').style.display='none';
+    $('sharedCatAddRow').style.display='none'; $('personalCatAddRow').style.display='none'; $('cardCoAddRow').style.display='none'; $('sharedCardCoAddRow').style.display='none'; $('housingCatAddRow').style.display='none';
 
     if(entry){
       if(entry.kind==='shared_expense'){
         selectedSharedCat = entry.category; $('ratioRange').value = entry.ratioMine;
         sharedPaymentMethod = entry.paymentMethod||'card'; selectedSharedCardCo = entry.cardCompany||null;
       }
+      if(entry.kind==='housing_living'){ selectedHousingCat = entry.category; $('housingRatioRange').value = entry.ratioMine; }
       if(entry.kind==='personal_expense'){ selectedPersonalCat = entry.category; paymentMethod = entry.paymentMethod||'card'; selectedCardCo = entry.cardCompany||null; }
       setKind(entry.kind);
     }else{
-      selectedSharedCat = null; selectedPersonalCat = null; selectedCardCo = null;
-      $('ratioRange').value = settings.ratioMine; paymentMethod='card';
+      selectedSharedCat = null; selectedPersonalCat = null; selectedCardCo = null; selectedHousingCat = null;
+      $('ratioRange').value = settings.ratioMine; $('housingRatioRange').value = settings.ratioMine; paymentMethod='card';
       sharedPaymentMethod = 'card'; selectedSharedCardCo = null;
       setKind('income');
     }
     updateRatioDisplay();
+    updateHousingRatioDisplay();
     $('deleteBtn').style.display = entry ? 'block' : 'none';
     $('backdrop').classList.add('open'); $('sheet').classList.add('open'); lockBodyScroll();
   }
@@ -959,6 +1022,10 @@
         if(!selectedSharedCardCo){ showToast('카드사를 선택해주세요'); return; }
         data.cardCompany = selectedSharedCardCo;
       }
+    }else if(currentKind==='housing_living'){
+      if(!selectedHousingCat){ showToast('항목을 선택해주세요'); return; }
+      data.category = selectedHousingCat;
+      data.ratioMine = parseInt($('housingRatioRange').value,10);
     }else if(currentKind==='personal_expense'){
       if(!selectedPersonalCat){ showToast('지출 항목을 선택해주세요'); return; }
       data.category = selectedPersonalCat;
