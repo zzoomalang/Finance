@@ -222,7 +222,9 @@
   <div class="who-card mine">
     <div class="who-head"><span class="who-dot"></span>나</div>
     <div class="who-row"><span>수입</span><b id="mineIncome">0</b></div>
-    <div class="who-row"><span>공통비 내 몫</span><b id="mineSharedShare">0</b></div>
+    <div class="who-row"><span>생활비</span><b id="mineLiving">0</b></div>
+    <div class="who-row"><span>주거비</span><b id="mineHousing">0</b></div>
+    <div class="who-row"><span>공통지출 내몫</span><b id="mineSharedShare">0</b></div>
     <div class="who-row"><span>개인지출</span><b id="minePersonal">0</b></div>
     <div class="who-remain"><div class="lbl">남는 돈</div><div class="val mono" id="mineRemaining">0</div></div>
   </div>
@@ -230,8 +232,8 @@
     <div class="who-head"><span class="who-dot"></span>와이프</div>
     <div class="who-row"><span>보내준 돈</span><b id="wifeGiven">0</b></div>
     <div class="who-row"><span>공통비 부담분</span><b id="wifeSharedShare">0</b></div>
-    <div class="who-row"><span>공통비 총액</span><b id="sharedTotal">0</b></div>
-    <div class="who-remain"><div class="lbl">남는 돈(차액)</div><div class="val mono" id="wifeRemaining">0</div></div>
+    <div class="who-row"><span>주거비</span><b id="wifeHousing">0</b></div>
+    <div class="who-remain"><div class="lbl">남는 돈</div><div class="val mono" id="wifeRemaining">0</div></div>
   </div>
 </div>
 
@@ -693,19 +695,25 @@
   }));
 
   function computeTotals(mEntries){
-    let mineIncome=0, wifeGiven=0, sharedTotal=0, mineSharedShare=0, minePersonal=0;
+    let mineIncome=0, wifeGiven=0, sharedTotal=0, sharedMineShare=0, minePersonal=0;
+    let livingMineShare=0, housingTotal=0, housingMineShare=0;
     mEntries.forEach(e=>{
       if(e.kind==='income') mineIncome += e.amount;
       else if(e.kind==='wife_gift') wifeGiven += e.amount;
-      else if(e.kind==='shared_expense' || e.kind==='housing_living'){ sharedTotal += e.amount; mineSharedShare += e.amount*(e.ratioMine/100); }
+      else if(e.kind==='shared_expense'){ sharedTotal += e.amount; sharedMineShare += e.amount*(e.ratioMine/100); }
+      else if(e.kind==='housing_living'){
+        if((e.category||'').includes('생활')){ livingMineShare += e.amount*(e.ratioMine/100); }
+        else{ housingTotal += e.amount; housingMineShare += e.amount*(e.ratioMine/100); }
+      }
       else if(e.kind==='personal_expense') minePersonal += e.amount;
     });
-    const wifeSharedShare = sharedTotal - mineSharedShare;
+    const sharedWifeShare = sharedTotal - sharedMineShare;
+    const housingWifeShare = housingTotal - housingMineShare;
     const mineAvailable = mineIncome + wifeGiven;
-    const mineExpense = minePersonal + mineSharedShare;
+    const mineExpense = livingMineShare + housingMineShare + sharedMineShare + minePersonal;
     const mineRemaining = mineAvailable - mineExpense;
-    const wifeRemaining = wifeGiven - wifeSharedShare;
-    return {mineIncome, wifeGiven, sharedTotal, mineSharedShare, wifeSharedShare, minePersonal, mineRemaining, wifeRemaining};
+    const wifeRemaining = wifeGiven - sharedWifeShare - housingWifeShare;
+    return {mineIncome, wifeGiven, sharedTotal, sharedMineShare, sharedWifeShare, livingMineShare, housingMineShare, housingWifeShare, minePersonal, mineRemaining, wifeRemaining};
   }
 
   function render(){
@@ -715,14 +723,16 @@
     const t = computeTotals(mEntries);
 
     $('mineIncome').textContent = fmt(t.mineIncome);
-    $('mineSharedShare').textContent = fmt(t.mineSharedShare);
+    $('mineLiving').textContent = fmt(t.livingMineShare);
+    $('mineHousing').textContent = fmt(t.housingMineShare);
+    $('mineSharedShare').textContent = fmt(t.sharedMineShare);
     $('minePersonal').textContent = fmt(t.minePersonal);
     const mr = $('mineRemaining'); mr.textContent = (t.mineRemaining>=0?'+':'') + fmt(t.mineRemaining);
     mr.className = 'val mono ' + (t.mineRemaining>=0?'pos':'neg');
 
     $('wifeGiven').textContent = fmt(t.wifeGiven);
-    $('wifeSharedShare').textContent = fmt(t.wifeSharedShare);
-    $('sharedTotal').textContent = fmt(t.sharedTotal);
+    $('wifeSharedShare').textContent = fmt(t.sharedWifeShare);
+    $('wifeHousing').textContent = fmt(t.housingWifeShare);
     const wr = $('wifeRemaining'); wr.textContent = (t.wifeRemaining>=0?'+':'') + fmt(t.wifeRemaining);
     wr.className = 'val mono ' + (t.wifeRemaining>=0?'pos':'neg');
 
