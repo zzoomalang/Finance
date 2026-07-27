@@ -1415,17 +1415,23 @@
       const sign = val>0 ? '+' : '';
       return `<td class="mono-cell ${cls}">${sign}${fmt(val)}</td>`;
     }
+    function expenseCell(val){
+      return `<td class="mono-cell neg">${val>0? '-':''}${fmt(val)}</td>`;
+    }
+    function incomeCell(val){
+      return `<td class="mono-cell">${fmt(val)}</td>`;
+    }
 
     const monthData = months.map(ym=>{
       const mEntries = entries.filter(e=> effectiveMonth(e)===ym);
       const t = computeTotals(mEntries);
-      const mineIncome = t.mineIncome + t.wifeGiven;
+      const mineIncome = t.mineIncome;
       const mineExpense = t.livingMineShare + t.housingMineShare + t.sharedMineShare + t.minePersonal;
       const mineNet = t.mineRemaining;
       const wifeIncome = t.wifeGiven;
       const wifeExpense = t.sharedWifeShare + t.housingWifeShare;
       const wifeNet = t.wifeRemaining;
-      const totalIncome = mineIncome;
+      const totalIncome = t.mineIncome + t.wifeGiven;
       const totalExpense = mineExpense + wifeExpense;
       const totalNet = totalIncome - totalExpense;
       return {ym, mineIncome, mineExpense, mineNet, wifeIncome, wifeExpense, wifeNet, totalIncome, totalExpense, totalNet};
@@ -1436,15 +1442,15 @@
     function groupRows(label, key){
       const rows = [
         {cls:'group-row', label, field:null},
-        {cls:'', label:'수입', field:key+'Income'},
-        {cls:'', label:'지출', field:key+'Expense'},
-        {cls:'', label:'차액', field:key+'Net'}
+        {cls:'', label:'수입', field:key+'Income', render:incomeCell},
+        {cls:'', label:'지출', field:key+'Expense', render:expenseCell},
+        {cls:'', label:'차액', field:key+'Net', render:cell}
       ];
       return rows.map(r=>{
         if(r.field===null){
           return `<tr class="${r.cls}"><td>${r.label}</td>${monthData.map(()=>'<td></td>').join('')}</tr>`;
         }
-        return `<tr><td class="sub-label">${r.label}</td>${monthData.map(d=> cell(d[r.field])).join('')}</tr>`;
+        return `<tr><td class="sub-label">${r.label}</td>${monthData.map(d=> r.render(d[r.field])).join('')}</tr>`;
       }).join('');
     }
 
