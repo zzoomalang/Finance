@@ -757,9 +757,8 @@
     });
     const sharedWifeShare = sharedTotal - sharedMineShare;
     const housingWifeShare = housingTotal - housingMineShare;
-    const mineAvailable = mineIncome + wifeGiven;
     const mineExpense = livingMineShare + housingMineShare + sharedMineShare + minePersonal;
-    const mineRemaining = mineAvailable - mineExpense;
+    const mineRemaining = mineIncome - mineExpense;
     const wifeRemaining = wifeGiven - sharedWifeShare - housingWifeShare;
     return {mineIncome, wifeGiven, sharedTotal, sharedMineShare, sharedWifeShare, livingMineShare, housingMineShare, housingWifeShare, minePersonal, mineRemaining, wifeRemaining};
   }
